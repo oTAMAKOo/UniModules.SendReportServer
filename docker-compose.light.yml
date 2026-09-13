@@ -1,0 +1,19 @@
+# 軽量構成（t3.nano + swap 向け）
+# 使い方: cp docker-compose.light.yml docker-compose.override.yml
+#
+# PostgreSQLのメモリ使用量を抑え、RAM 0.5GB環境で動作可能にします。
+# t3.micro以上の場合はこのファイルは不要です（PostgreSQLデフォルトで動作）。
+
+services:
+  db:
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c work_mem=2MB
+      -c maintenance_work_mem=16MB
+      -c effective_cache_size=128MB
+      -c max_connections=20
+
+  app:
+    environment:
+      - UVICORN_WORKERS=1

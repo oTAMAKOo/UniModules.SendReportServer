@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}レポート管理 - Log Server{% endblock %}
+{% block extra_css %}
+<style>
+    .manage-section {
+        background: var(--bg-table-td);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 20px;
+        max-width: 600px;
+    }
+    .manage-section h5 { color: var(--text-primary); margin-bottom: 16px; }
+    .manage-section label { color: var(--text-secondary); font-size: 13px; }
+    .manage-section .form-control {
+        background: var(--bg-log-odd);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+    .manage-section .form-control:focus {
+        background: var(--bg-log-odd);
+        color: var(--text-primary);
+        border-color: #5a9fd4;
+        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
+    }
+    .stat-text { color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; }
+    .alert { font-size: 14px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a class="page-header-back" href="{{ PREFIX }}/admin">管理メニュー</a>
+    <span class="page-header-sep">›</span>
+    <span class="page-header-title">レポート管理</span>
+</div>
+
+{% if message %}
+<div class="alert alert-success">{{ message }}</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="stat-text">現在のレポート数: {{ total_count }} 件</div>
+
+<div class="manage-section">
+    <h5>期間指定 一括削除</h5>
+    <form method="post" action="{{ PREFIX }}/manage/bulk_delete" onsubmit="return confirm('指定期間のレポートを一括削除します。この操作は取り消せません。実行しますか？')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="row mb-3">
+            <div class="col">
+                <label for="date_from" class="form-label">開始日</label>
+                <input type="date" class="form-control form-control-sm" id="date_from" name="date_from">
+            </div>
+            <div class="col">
+                <label for="date_to" class="form-label">終了日</label>
+                <input type="date" class="form-control form-control-sm" id="date_to" name="date_to">
+            </div>
+        </div>
+        <div class="form-text mb-3" style="color:var(--text-secondary); font-size:12px;">
+            開始日のみ指定: その日以前を削除 / 終了日のみ指定: その日以降を削除 / 両方指定: 期間内を削除
+        </div>
+        <button type="submit" class="btn btn-danger btn-sm">一括削除</button>
+    </form>
+</div>
+{% endblock %}

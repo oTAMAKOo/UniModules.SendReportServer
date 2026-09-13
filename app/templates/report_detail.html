@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+{% block title %}Report #{{ report.id }} - Log Server{% endblock %}
+{% block extra_css %}
+<style>
+    .navbar { margin-bottom: 10px; }
+    .container { max-width: 95vw; }
+    .detail-well {
+        width: 90vw;
+        margin: 0 auto;
+    }
+    .detail-well h2 { color: var(--text-primary); margin-bottom: 16px; }
+    .dark-table {
+        width: 100%;
+        border-collapse: collapse;
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+    .dark-table th, .dark-table td {
+        border: 1px solid var(--border-color);
+        padding: 6px 10px;
+        vertical-align: top;
+    }
+    .dark-table th {
+        background-color: var(--bg-table-th);
+        color: var(--text-secondary);
+        width: 120px;
+        white-space: nowrap;
+        font-weight: normal;
+    }
+    .dark-table td {
+        background-color: var(--bg-table-td);
+        word-break: break-all;
+    }
+    .dark-table .screenshot-cell {
+        text-align: left;
+        padding: 10px;
+        background-color: var(--bg-table-td);
+    }
+    .dark-table .screenshot-cell img {
+        max-width: 600px;
+        max-height: 600px;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: opacity 0.2s;
+    }
+    .dark-table .screenshot-cell img:hover {
+        opacity: 0.8;
+    }
+    /* Lightbox overlay */
+    .lightbox-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+    }
+    .lightbox-overlay.active {
+        display: flex;
+    }
+    .lightbox-inner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        max-width: 95vw;
+        max-height: 95vh;
+    }
+    .lightbox-inner img {
+        max-width: 95vw;
+        max-height: 95vh;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        border-radius: 4px;
+    }
+
+    /* Unity Console style log area */
+    #Log_info {
+        width: 100%;
+        max-width: calc(90vw - 142px);
+        height: 200px;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        word-wrap: break-word;
+        background: var(--bg-log-odd);
+    }
+    #Log_info .log-row {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        padding: 3px 6px;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-primary);
+        font-size: 13px;
+        font-family: Consolas, 'Courier New', monospace;
+        border-bottom: 1px solid var(--border-log);
+    }
+    #Log_info .log-row:nth-child(even) { background-color: var(--bg-log-even); }
+    #Log_info .log-row:nth-child(odd)  { background-color: var(--bg-log-odd); }
+    #Log_info .log-row:hover           { background-color: var(--bg-log-hover); }
+    #Log_info .log-row.active           { background-color: var(--bg-log-active) !important; }
+    /* Error/Warning rows: same as normal (Unity style), only icon differs */
+    #Log_info .log-row img {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+    }
+    #Log_info .log-row .log-msg {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        flex: 1;
+    }
+
+    /* Stacktrace area */
+    #StackTrace {
+        width: 100%;
+        max-width: calc(90vw - 142px);
+        height: 300px;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        background: var(--bg-stacktrace);
+        color: var(--text-stacktrace);
+    }
+    #StackTrace .log_info {
+        display: none;
+        white-space: pre-wrap;
+        word-break: break-all;
+        padding: 8px 12px;
+        margin: 0;
+        font-size: 13px;
+        font-family: Consolas, 'Courier New', monospace;
+    }
+    /* Copy button below stacktrace */
+    .copy-btn {
+        background: none;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        border-radius: 4px;
+        padding: 4px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin: 6px 8px;
+    }
+    .copy-btn:hover { color: var(--text-primary); border-color: var(--text-primary); }
+    .copy-btn.copied { color: #4caf50; border-color: #4caf50; }
+
+    /* モバイル対応 */
+    @media screen and (max-width: 768px) {
+        .container { max-width: 100%; padding: 0 4px; overflow-x: hidden; }
+        .detail-well { width: 100%; margin: 0; }
+        .dark-table th {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            border-bottom: none;
+        }
+        .dark-table td {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .dark-table .screenshot-cell img {
+            max-width: 100%;
+        }
+        #Log_info,
+        #StackTrace {
+            max-width: 100%;
+        }
+        #Log_info .log-row {
+            white-space: normal;
+            word-break: break-all;
+        }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header" style="justify-content: space-between;">
+    <a class="page-header-back" href="{{ PREFIX }}/list">&laquo; レポート一覧</a>
+    <form method="post" action="{{ PREFIX }}/delete/{{ report.id }}" onsubmit="return confirm('このレポートを削除しますか？')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
+    </form>
+</div>
+<div class="detail-well">
+    <div>
+        <table class="dark-table">
+            {# Screenshot #}
+            {% if img_url %}
+            <tr>
+                <td colspan="2" class="screenshot-cell">
+                    <img src="{{ img_url }}" alt="Screenshot" onclick="openLightbox(this.src)">
+                </td>
+            </tr>
+            {% endif %}
+
+            {# Basic Info #}
+            <tr>
+                <th>投稿時間</th>
+                <td>{{ report.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            <tr>
+                <th>ユーザー</th>
+                <td>{{ report.user_name or 'None' }} ({{ report.user_id or 'None' }})</td>
+            </tr>
+            <tr>
+                <th>端末情報</th>
+                <td>{{ report.device_model or '-' }}</td>
+            </tr>
+
+            {# Extended Info #}
+            {% if extend_info %}
+            {% for key, value in extend_info.items() %}
+            <tr>
+                <th>{{ key }}</th>
+                <td>{{ value }}</td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+
+            {# Log Info - Unity Console style #}
+            <tr>
+                <th>ログ情報</th>
+                <td style="padding:0;">
+                    <div id="Log_info">
+                        {% if log_entries %}
+                        {% for entry in log_entries %}
+                        <div class="log-row {% if entry.logType in [0, 1, 4] %}log-error{% elif entry.logType == 2 %}log-warn{% endif %}" onclick="ClickEvent({{ loop.index0 }})" id="log-p-{{ loop.index0 }}">
+                            {% if entry.logType in [0, 1, 4] %}
+                            <img src="/static/icons/d_console_erroricon.png" alt="error">
+                            {% elif entry.logType == 2 %}
+                            <img src="/static/icons/d_console_warnicon.png" alt="warn">
+                            {% else %}
+                            <img src="/static/icons/d_console_infoicon.png" alt="info">
+                            {% endif %}
+                            <span class="log-msg">{{ entry.message | safe }}</span>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p style="color:#888; padding:12px;">No log data</p>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+
+            {# Stacktrace #}
+            <tr>
+                <th>スタックトレース</th>
+                <td style="padding:0;">
+                    <div id="StackTrace">
+                        {% for entry in log_entries %}
+                        <p style="display:none;" class="log_info" id="{{ loop.index0 }}">{{ entry.message | safe }}
+{{ entry.stacktrace }}</p>
+                        {% endfor %}
+                    </div>
+                    <button class="copy-btn" onclick="copyStacktrace(this)" title="Copy to clipboard">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <span class="copy-label">Copy</span>
+                    </button>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+    <div class="lightbox-inner">
+        <img id="lightbox-img" src="" alt="Screenshot">
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openLightbox(src) {
+    var lb = document.getElementById('lightbox');
+    document.getElementById('lightbox-img').src = src;
+    lb.classList.add('active');
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('active');
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeLightbox();
+});
+
+function copyStacktrace(btn) {
+    var visible = document.querySelector('#StackTrace .log_info[style*="block"]');
+    var text = visible ? visible.textContent.trim() : '';
+    if (!text) {
+        return;
+    }
+    navigator.clipboard.writeText(text).then(function() {
+        btn.classList.add('copied');
+        btn.querySelector('.copy-label').textContent = 'Copied!';
+        setTimeout(function() {
+            btn.classList.remove('copied');
+            btn.querySelector('.copy-label').textContent = 'Copy';
+        }, 2000);
+    });
+}
+
+function ClickEvent(log_info_id) {
+    var logInfos = document.getElementsByClassName('log_info');
+    for (var i = 0; i < logInfos.length; i++) {
+        logInfos[i].style.display = 'none';
+    }
+    document.getElementById(log_info_id).style.display = 'block';
+
+    var rows = document.querySelectorAll('#Log_info .log-row');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].classList.remove('active');
+    }
+    document.getElementById('log-p-' + log_info_id).classList.add('active');
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+    var loginfo = document.getElementById('Log_info');
+    if (loginfo) {
+        loginfo.scrollTop = loginfo.scrollHeight;
+    }
+    // apply saved theme icons
+    var theme = localStorage.getItem('log-server-theme') || 'dark';
+    if (typeof updateIcons === 'function') updateIcons(theme);
+});
+</script>
+{% endblock %}

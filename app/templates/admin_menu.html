@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}管理メニュー - Log Server{% endblock %}
+{% block extra_css %}
+<style>
+    .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+    }
+    .menu-card {
+        background: var(--bg-table-td);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        text-decoration: none;
+        color: var(--text-primary);
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+    .menu-card:hover {
+        background: var(--bg-log-hover);
+        border-color: var(--text-secondary);
+        color: var(--text-primary);
+    }
+    .menu-card h5 { margin-bottom: 8px; }
+    .menu-card p { color: var(--text-secondary); font-size: 13px; margin: 0; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a class="page-header-back" href="{{ PREFIX }}/list">レポート一覧</a>
+    <span class="page-header-sep">›</span>
+    <span class="page-header-title">管理メニュー</span>
+</div>
+<div class="menu-grid">
+    <a class="menu-card" href="{{ PREFIX }}/password_change">
+        <h5>パスワード変更</h5>
+        <p>自分のパスワードを変更します</p>
+    </a>
+    {% if is_superuser %}
+    <a class="menu-card" href="{{ PREFIX }}/manage">
+        <h5>レポート管理</h5>
+        <p>期間指定の一括削除などレポートの管理操作</p>
+    </a>
+    <a class="menu-card" href="{{ PREFIX }}/users">
+        <h5>ユーザー管理</h5>
+        <p>管理ユーザーの追加・削除・パスワードリセット</p>
+    </a>
+    <a class="menu-card" href="{{ PREFIX }}/system">
+        <h5>システム</h5>
+        <p>AES暗号化キー・IVなどのシステム設定</p>
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

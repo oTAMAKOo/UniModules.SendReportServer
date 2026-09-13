@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}システム設定 - Log Server{% endblock %}
+{% block extra_css %}
+<style>
+    .config-form {
+        max-width: 500px;
+        margin: 0 auto;
+        background: var(--bg-table-td);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 24px;
+    }
+    .config-form h3 { color: var(--text-primary); margin-bottom: 20px; }
+    .config-form label { color: var(--text-secondary); font-size: 13px; }
+    .config-form .form-control {
+        background: var(--bg-log-odd);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+        font-family: Consolas, 'Courier New', monospace;
+    }
+    .config-form .form-control:focus {
+        background: var(--bg-log-odd);
+        color: var(--text-primary);
+        border-color: #5a9fd4;
+        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
+    }
+    .config-form .btn-primary { width: 100%; margin-top: 8px; }
+    .config-form .form-text { color: var(--text-secondary); font-size: 12px; }
+    .alert { font-size: 14px; }
+
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a class="page-header-back" href="{{ PREFIX }}/admin">管理メニュー</a>
+    <span class="page-header-sep">›</span>
+    <span class="page-header-title">システム設定</span>
+</div>
+<div class="config-form">
+    {% if message %}
+    <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="{{ PREFIX }}/system">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="mb-3">
+            <label for="aes_key" class="form-label">AES Key</label>
+            <input type="text" class="form-control" id="aes_key" name="aes_key" value="{{ aes_key }}" required>
+            <div class="form-text">32文字（AES-256）</div>
+        </div>
+        <div class="mb-3">
+            <label for="aes_iv" class="form-label">AES IV</label>
+            <input type="text" class="form-control" id="aes_iv" name="aes_iv" value="{{ aes_iv }}" required>
+            <div class="form-text">16文字</div>
+        </div>
+        <hr style="border-color: var(--border-color); margin: 20px 0;">
+        <div class="mb-3">
+            <label for="session_hours" class="form-label">セッション有効期限</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" class="form-control" id="session_hours" name="session_hours" value="{{ session_hours }}" min="1" max="8760" style="width: 120px;" required>
+                <span style="color: var(--text-secondary); font-size: 13px;">時間</span>
+            </div>
+            <div class="form-text">ログインからこの時間を経過すると自動ログアウトされます<br>（デフォルト: 24時間）</div>
+        </div>
+        <button type="submit" class="btn btn-primary">保存</button>
+    </form>
+</div>
+{% endblock %}

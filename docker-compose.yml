@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: logserver
+      POSTGRES_PASSWORD: logserver
+      POSTGRES_DB: logserver
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logserver"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # メモリチューニングは docker-compose.override.yml で設定
+    # 軽量構成: cp docker-compose.light.yml docker-compose.override.yml
+    # 標準構成: override なし（PostgreSQLデフォルト）
+
+  app:
+    build: .
+    env_file: .env
+    volumes:
+      - ./app:/app/app
+      - app_storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - app_storage:/app/storage:ro
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  app_storage:

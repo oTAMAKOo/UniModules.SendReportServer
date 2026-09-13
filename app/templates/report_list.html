@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}レポート一覧 - Log Server{% endblock %}
+{% block extra_css %}
+<style>
+    .container { max-width: 960px; }
+
+    /* Header bar */
+    .list-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        gap: 16px;
+    }
+    .list-header h2 {
+        color: var(--text-primary);
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+        white-space: nowrap;
+    }
+
+    /* Search bar */
+    .search-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .search-input-wrap {
+        position: relative;
+    }
+    .search-input-wrap img {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 14px;
+        height: 14px;
+        opacity: 0.5;
+    }
+    .search-input {
+        width: 220px;
+        padding: 6px 10px 6px 32px;
+        font-size: 13px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-input);
+        border-radius: 6px;
+        color: var(--text-primary);
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
+    .search-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(88,166,255,0.15);
+    }
+    .date-input {
+        width: 140px;
+        padding: 6px 8px;
+        font-size: 13px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-input);
+        border-radius: 6px;
+        color: var(--text-primary);
+        outline: none;
+        transition: border-color 0.15s;
+    }
+    [data-theme="dark"] .date-input::-webkit-calendar-picker-indicator {
+        filter: invert(0.7);
+    }
+    .date-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(88,166,255,0.15);
+    }
+    .search-bar .sep { color: var(--text-secondary); font-size: 13px; opacity: 0.5; }
+    .btn-search {
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 500;
+        border: 1px solid var(--border-input);
+        border-radius: 6px;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+    }
+    .btn-search:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--text-secondary);
+    }
+    .btn-clear {
+        padding: 6px 12px;
+        font-size: 13px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        text-decoration: none;
+        transition: color 0.15s;
+        white-space: nowrap;
+    }
+    .btn-clear:hover { color: var(--text-primary); }
+
+    /* Result count */
+    .result-info {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        padding: 0 4px;
+    }
+
+    /* Report list card */
+    .report-list-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-card);
+        border-radius: 8px;
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+    .report-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-card);
+        cursor: pointer;
+        transition: background 0.12s;
+        text-decoration: none;
+        color: var(--text-primary);
+    }
+    .report-row:last-child { border-bottom: none; }
+    .report-row:hover {
+        background: var(--bg-card-hover);
+        color: var(--text-primary);
+        text-decoration: none;
+    }
+    .report-thumb {
+        max-width: 225px;
+        max-height: 225px;
+        width: auto;
+        height: auto;
+        border-radius: 6px;
+        object-fit: contain;
+        flex-shrink: 0;
+        background: var(--bg-body);
+    }
+    .report-thumb-empty {
+        width: 225px;
+        height: 225px;
+        border-radius: 6px;
+        flex-shrink: 0;
+        background: var(--bg-body);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        font-size: 11px;
+        opacity: 0.4;
+    }
+    .report-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .report-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 16px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .report-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    .report-meta span { white-space: nowrap; }
+    .report-empty {
+        padding: 40px 20px;
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+
+    /* Pagination */
+    .pagination-wrap {
+        display: flex;
+        justify-content: center;
+        margin-top: 16px;
+        gap: 4px;
+    }
+    .page-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        font-size: 13px;
+        border-radius: 6px;
+        border: 1px solid var(--border-card);
+        background: var(--bg-card);
+        color: var(--text-primary);
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s;
+    }
+    .page-btn:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--text-secondary);
+        color: var(--text-primary);
+        text-decoration: none;
+    }
+    .page-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+    }
+    .page-btn.disabled {
+        opacity: 0.35;
+        pointer-events: none;
+        cursor: default;
+    }
+    .page-ellipsis {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="list-header">
+    <h2>レポート一覧</h2>
+    <form method="get" action="{{ PREFIX }}/list" class="search-bar">
+        <div class="search-input-wrap">
+            <img src="/static/icons/d_search.png" alt="" class="search-icon-img">
+            <input type="text" class="search-input" name="q" value="{{ q }}" placeholder="全文検索">
+        </div>
+        <input type="date" class="date-input" name="date_from" value="{{ date_from }}">
+        <span class="sep">~</span>
+        <input type="date" class="date-input" name="date_to" value="{{ date_to }}">
+        <button type="submit" class="btn-search">検索</button>
+        {% if q or date_from or date_to %}<a href="{{ PREFIX }}/list" class="btn-clear">クリア</a>{% endif %}
+    </form>
+</div>
+
+<div class="result-info">{{ total }} 件{% if q or date_from or date_to %} &mdash; フィルタ適用中{% endif %}</div>
+
+{% set filter_params = "" %}
+{% if q %}{% set filter_params = filter_params ~ "&q=" ~ q %}{% endif %}
+{% if date_from %}{% set filter_params = filter_params ~ "&date_from=" ~ date_from %}{% endif %}
+{% if date_to %}{% set filter_params = filter_params ~ "&date_to=" ~ date_to %}{% endif %}
+
+<div class="report-list-card">
+    {% for r in reports %}
+    <a class="report-row" href="{{ PREFIX }}/detail/{{ r.id }}">
+        {% if r.thumb_url %}
+        <img class="report-thumb" src="{{ r.thumb_url }}" alt="">
+        {% else %}
+        <div class="report-thumb-empty">No img</div>
+        {% endif %}
+        <div class="report-info">
+            <div class="report-title">{{ r.title or '(タイトルなし)' }}</div>
+            <div class="report-meta">
+                <span>{{ r.user_name or '—' }}</span>
+                {% if r.device_model %}<span>{{ r.device_model }}</span>{% endif %}
+                <span>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+        </div>
+    </a>
+    {% else %}
+    <div class="report-empty">レポートがありません</div>
+    {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination-wrap">
+    <a class="page-btn {% if page == 1 %}disabled{% endif %}" href="?page={{ page - 1 }}{{ filter_params }}">&#8249;</a>
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span class="page-btn active">{{ p }}</span>
+        {% elif p <= 3 or p > total_pages - 3 or (p >= page - 2 and p <= page + 2) %}
+        <a class="page-btn" href="?page={{ p }}{{ filter_params }}">{{ p }}</a>
+        {% elif p == 4 or p == total_pages - 3 %}
+        <span class="page-ellipsis">...</span>
+        {% endif %}
+    {% endfor %}
+    <a class="page-btn {% if page == total_pages %}disabled{% endif %}" href="?page={{ page + 1 }}{{ filter_params }}">&#8250;</a>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// テーマに応じて検索アイコンを切り替え
+(function() {
+    function updateSearchIcon() {
+        var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        var img = document.querySelector('.search-icon-img');
+        if (img) img.src = '/static/icons/' + (theme === 'dark' ? 'd_search' : 'search') + '.png';
+    }
+    updateSearchIcon();
+    var origToggle = window.toggleTheme;
+    window.toggleTheme = function() { origToggle(); updateSearchIcon(); };
+})();
+</script>
+{% endblock %}

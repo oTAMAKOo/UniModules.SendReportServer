@@ -1,6 +1,5 @@
 import json
 import math
-import os
 import secrets
 import string
 
@@ -25,7 +24,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import AdminUser, ReportData, SystemConfig
 from app.ratelimit import login_limiter
-from app.storage import get_image_url
+from app.storage import delete_screenshot, get_image_url
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -545,14 +544,7 @@ async def report_bulk_delete(
     reports = query.all()
     deleted_count = len(reports)
     for report in reports:
-        if report.img_name and settings.storage_mode == "local":
-            img_path = os.path.join(settings.local_storage_path, "report/images", report.img_name)
-            if os.path.exists(img_path):
-                os.remove(img_path)
-        if report.img_thumbnail_name and settings.storage_mode == "local":
-            thumb_path = os.path.join(settings.local_storage_path, "report/thumbnail", report.img_thumbnail_name)
-            if os.path.exists(thumb_path):
-                os.remove(thumb_path)
+        delete_screenshot(report.img_name, report.img_thumbnail_name)
         db.delete(report)
     db.commit()
 
@@ -665,14 +657,7 @@ async def report_delete(
     report = db.query(ReportData).filter(ReportData.id == report_id).first()
     if report:
         # 画像ファイルも削除
-        if report.img_name and settings.storage_mode == "local":
-            img_path = os.path.join(settings.local_storage_path, "report/images", report.img_name)
-            if os.path.exists(img_path):
-                os.remove(img_path)
-        if report.img_thumbnail_name and settings.storage_mode == "local":
-            thumb_path = os.path.join(settings.local_storage_path, "report/thumbnail", report.img_thumbnail_name)
-            if os.path.exists(thumb_path):
-                os.remove(thumb_path)
+        delete_screenshot(report.img_name, report.img_thumbnail_name)
         db.delete(report)
         db.commit()
     return _redirect("/list")

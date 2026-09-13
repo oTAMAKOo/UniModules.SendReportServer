@@ -1,4 +1,4 @@
-# BugLogServer
+# UniModules.SendReportServer
 
 # プロジェクト共通ルール
 
@@ -30,7 +30,7 @@ Unityクライアントからのクラッシュレポート（AES-256-CBC暗号�
 ## ディレクトリ構成
 
 ```
-BugLogServer/
+UniModules.SendReportServer/
 ├── README.md               # 他プロジェクトへの導入手順
 ├── .env.example            # 環境変数テンプレート（.envは.gitignore対象）
 ├── Dockerfile

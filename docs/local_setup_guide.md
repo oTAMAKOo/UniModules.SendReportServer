@@ -30,8 +30,8 @@ Claude Codeに「この手順書に従ってローカル環境をセットアッ
 ### Step 1: リポジトリのクローン
 
 ```bash
-git clone git@github.com:oTAMAKOo/BugLogServer.git
-cd BugLogServer
+git clone git@github.com:oTAMAKOo/UniModules.SendReportServer.git
+cd UniModules.SendReportServer
 ```
 
 > 他プロジェクトへサブモジュールとして組み込む場合は、リポジトリ直下の `README.md` を参照してください。
@@ -232,7 +232,7 @@ docker compose exec app bash
 ## ディレクトリ構成
 
 ```
-BugLogServer/
+UniModules.SendReportServer/
 ├── .env                    # 環境変数（git管理外）
 ├── .env.example            # .env のテンプレート
 ├── Dockerfile              # Python 3.11 ベースのアプリイメージ

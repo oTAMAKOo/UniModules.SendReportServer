@@ -1,14 +1,14 @@
-# BugLogServer
+# UniModules.SendReportServer
 
 Unity クライアント（UniModules の `SendReport` モジュール）から送られるクラッシュレポートを受信・閲覧・管理するログサーバー。
 FastAPI + PostgreSQL + Nginx を Docker Compose で動かすスタンドアロン構成。
 
-プロジェクト固有の値は `.env` と DB のシステム設定で外に出してあるため、**このリポジトリをサブモジュールとして取り込めば任意のプロジェクトで使える**（URL プレフィックスのみ現状ハードコード。下表を参照）。
+プロジェクト固有の値は `.env` と DB のシステム設定で外に出してあるため、**このリポジトリをサブモジュールとして取り込めば任意のプロジェクトで使える**。
 
 ## リポジトリ構成
 
 ```
-BugLogServer/
+UniModules.SendReportServer/
 ├── .env.example            # 環境変数テンプレート（.env は git 管理外）
 ├── Dockerfile
 ├── docker-compose.yml      # 開発用
@@ -26,8 +26,8 @@ BugLogServer/
 導入先プロジェクトのリポジトリルートで実行する。
 
 ```bash
-git submodule add git@github.com:oTAMAKOo/BugLogServer.git BugLogServer
-git commit -m "BugLogServer をサブモジュールとして追加"
+git submodule add git@github.com:oTAMAKOo/UniModules.SendReportServer.git UniModules.SendReportServer
+git commit -m "UniModules.SendReportServer をサブモジュールとして追加"
 ```
 
 クローン済みのリポジトリで取得する場合:
@@ -41,7 +41,7 @@ git submodule update --init --recursive
 `.env` は `.gitignore` 対象なので、導入先プロジェクトのリポジトリには**含めない**（秘匿情報のため）。
 
 ```bash
-cd BugLogServer
+cd UniModules.SendReportServer
 cp .env.example .env
 ```
 
@@ -50,7 +50,7 @@ cp .env.example .env
 | キー | 内容 |
 |---|---|
 | `REPORT_AES_KEY` / `REPORT_AES_IV` | Unity クライアント側の `PLCryptoAES.KEY`（32文字）/ `PLCryptoAES.IV`（16文字）と一致させる。ここがズレるとレポートを復号できない |
-| `URL_PREFIX` | 管理画面・API の URL プレフィックス。**現状この値はアプリから読まれておらず、`/buglog` が `app/main.py` と `app/routers/admin.py` にハードコードされている** |
+| `URL_PREFIX` | 管理画面・API の URL プレフィックス（既定 `/buglog`）。先頭の `/` は省略可、末尾の `/` は無視される。空にするとルート直下（`/login` 等）にマウントされる |
 | `SECRET_KEY` | セッション署名用。プロジェクト毎にランダム文字列を設定する |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 起動時に作られる初期管理者。初回ログイン後に変更する |
 | `DATABASE_URL` | 既定の Docker Compose 構成のままなら変更不要 |

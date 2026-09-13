@@ -339,19 +339,19 @@ git --version
 **方法A: Gitからクローン（推奨）**
 ```bash
 cd /home/ec2-user
-git clone git@github.com:oTAMAKOo/BugLogServer.git log-server
+git clone git@github.com:oTAMAKOo/UniModules.SendReportServer.git log-server
 cd log-server
 ```
 
 **方法B: ローカルPCからSCPで転送**
 ```bash
 # ローカルPCで（リポジトリの親ディレクトリから実行）
-scp -i logserver-key.pem -r ./BugLogServer ec2-user@<SERVER_IP>:/home/ec2-user/log-server
+scp -i logserver-key.pem -r ./UniModules.SendReportServer ec2-user@<SERVER_IP>:/home/ec2-user/log-server
 ```
 
-> 転送先 `/home/ec2-user/log-server` が既に存在する場合は、中身だけを転送する（ディレクトリ指定だと `log-server/BugLogServer` と二重にネストするため）:
+> 転送先 `/home/ec2-user/log-server` が既に存在する場合は、中身だけを転送する（ディレクトリ指定だと `log-server/UniModules.SendReportServer` と二重にネストするため）:
 ```bash
-scp -i logserver-key.pem -r ./BugLogServer/* ec2-user@<SERVER_IP>:/home/ec2-user/log-server/
+scp -i logserver-key.pem -r ./UniModules.SendReportServer/* ec2-user@<SERVER_IP>:/home/ec2-user/log-server/
 ```
 
 ### 7-2. 本番用 .env ファイルの作成

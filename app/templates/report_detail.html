@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Report #{{ report.id }} - Log Server{% endblock %}
+{% block title %}{{ report.title or 'Report' }} #{{ report.id }} - Log Server{% endblock %}
 {% block extra_css %}
 <style>
     .navbar { margin-bottom: 10px; }
@@ -207,6 +207,10 @@
             {% endif %}
 
             {# Basic Info #}
+            <tr>
+                <th>タイトル</th>
+                <td>{{ report.title or '(タイトルなし)' }}</td>
+            </tr>
             <tr>
                 <th>投稿時間</th>
                 <td>{{ report.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>

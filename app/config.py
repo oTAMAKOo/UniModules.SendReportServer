@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -19,6 +20,23 @@ class Settings(BaseSettings):
     admin_password: str = "password"
 
     secret_key: str = "change-this-to-a-random-string"
+
+    # 全ルートの先頭に付くURLプレフィックス。空文字にするとルート直下にマウントされる。
+    url_prefix: str = "/buglog"
+
+    @field_validator("url_prefix")
+    @classmethod
+    def _normalize_url_prefix(cls, value: str) -> str:
+        """先頭の "/" を補完し、末尾の "/" を除去する。"/" のみの場合は空文字になる。"""
+        value = value.strip().rstrip("/")
+
+        if not value:
+            return ""
+
+        if not value.startswith("/"):
+            value = "/" + value
+
+        return value
 
     model_config = {"env_file": ".env"}
 

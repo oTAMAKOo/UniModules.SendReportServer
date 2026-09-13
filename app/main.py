@@ -8,8 +8,6 @@ from app.config import settings
 from app.database import SessionLocal
 from app.routers import api, admin
 
-_PREFIX = "/buglog"
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,11 +21,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Log Server", docs_url="/docs", redoc_url=None, lifespan=lifespan)
 
-app.include_router(api.router, prefix=_PREFIX)
-app.include_router(admin.router, prefix=_PREFIX)
+app.include_router(api.router, prefix=settings.url_prefix)
+app.include_router(admin.router, prefix=settings.url_prefix)
 
 # Jinja2テンプレートにURLプレフィックスをグローバル変数として渡す
-admin.templates.env.globals["PREFIX"] = _PREFIX
+admin.templates.env.globals["PREFIX"] = settings.url_prefix
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 

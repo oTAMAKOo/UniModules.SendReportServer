@@ -32,13 +32,14 @@ templates = Jinja2Templates(directory="app/templates")
 
 ITEMS_PER_PAGE = 25
 
-# URLプレフィックス（テンプレートにはJinja2グローバル変数 PREFIX として渡される）
-_PREFIX = "/buglog"
-
 
 def _redirect(path: str, status_code: int = 302) -> RedirectResponse:
-    """プレフィックス付きリダイレクトを生成するヘルパー。"""
-    return RedirectResponse(url=f"{_PREFIX}{path}", status_code=status_code)
+    """プレフィックス付きリダイレクトを生成するヘルパー。
+
+    プレフィックスは settings.url_prefix（テンプレートにはJinja2グローバル変数
+    PREFIX として渡される）。
+    """
+    return RedirectResponse(url=f"{settings.url_prefix}{path}", status_code=status_code)
 
 
 def _get_current_user(request: Request, db: Session) -> AdminUser | None:

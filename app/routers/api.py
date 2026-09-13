@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.crypto import decrypt_report_body
 from app.database import get_db
 from app.models import ReportData
@@ -59,6 +60,6 @@ async def receive_report(request: Request, db: Session = Depends(get_db)):
     db.refresh(report)
 
     base_url = str(request.base_url).rstrip("/")
-    url = f"{base_url}/buglog/detail/{report.id}"
+    url = f"{base_url}{settings.url_prefix}/detail/{report.id}"
 
     return ReportResponse(URL=url)

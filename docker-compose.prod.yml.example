@@ -8,6 +8,13 @@
 # 実ファイル docker-compose.prod.yml は DB パスワードを含むため .gitignore 対象。
 # 詳細な手順は docs/aws_deploy_standard.md（通常構成）または
 # docs/aws_deploy_budget.md（安価構成）の 7-3 を参照。
+#
+# !override について:
+#   compose の ports / volumes は override 側に書いても既定では「マージ」される。
+#   ports は連結され、volumes は同じマウント先だけが差し替わる。
+#   そのため単に `ports: []` と書いても開発用の 5432 は閉じず、volumes に
+#   app_storage だけ書いても ./app のバインドマウントが残る。
+#   置き換えるには !override タグが要る（Docker Compose v2.24.0 以降）。
 
 services:
   db:
@@ -16,11 +23,13 @@ services:
       # 生成例: python3 -c "import secrets; print(secrets.token_urlsafe(24))"
       POSTGRES_PASSWORD: CHANGE_ME
     # 開発用 compose が公開している 5432 を塞ぐ。
-    ports: []
+    ports: !override []
     restart: always
 
   app:
-    volumes:
+    # 開発用の ./app バインドマウントを外し、イメージに焼いたコードを使う
+    # （コード更新は up -d --build で反映する）。
+    volumes: !override
       - app_storage:/app/storage
     # 開発用の --reload を外す。
     # --workers はホストのRAMに合わせる（0.5GB の安価構成は 1、1GB 以上なら 2）。
@@ -33,10 +42,10 @@ services:
     restart: always
     # HTTPS を使う場合は以下のコメントを外す（証明書を certbot で取得済みであること）。
     # 手順は docs/aws_deploy_standard.md の 9-5、または aws_deploy_budget.md の 9-5。
-    # ports:
+    # ports: !override
     #   - "80:80"
     #   - "443:443"
-    # volumes:
+    # volumes: !override
     #   - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
     #   - app_storage:/app/storage:ro
     #   - /etc/letsencrypt:/etc/letsencrypt:ro

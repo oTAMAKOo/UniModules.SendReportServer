@@ -397,30 +397,23 @@ python3 -c "import secrets; print(secrets.token_urlsafe(24))"  # DB_PASSWORD
 
 ### 7-3. docker-compose.prod.yml の作成
 
+リポジトリに雛形があるので、コピーして書き換えます。
+
 ```bash
-cat > docker-compose.prod.yml << 'EOF'
-services:
-  db:
-    environment:
-      POSTGRES_PASSWORD: <.envのDB_PASSWORDと同じ値>
-    ports: []
-    restart: always
-
-  app:
-    volumes:
-      - app_storage:/app/storage
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
-    restart: always
-
-  nginx:
-    restart: always
-EOF
+cp docker-compose.prod.yml.example docker-compose.prod.yml
+vi docker-compose.prod.yml
 ```
 
-> **通常版では `--workers 2`** にしています（RAM 1GBなら余裕あり）。
+書き換えるのは 1 箇所だけです。
+
+- `POSTGRES_PASSWORD: CHANGE_ME` → `.env` の `DB_PASSWORD` と同じ値
+
+> **通常版は雛形のままの `--workers 2`** で構いません（RAM 1GBなら余裕あり）。
 > **`docker-compose.override.yml` の作成は不要です。** PostgreSQLはデフォルト設定で動作します。
+>
+> 雛形の `ports: !override []` と `volumes: !override` は、開発用 compose の 5432 公開と
+> `./app` バインドマウントを打ち消すためのものです。`!override` を外すと compose が
+> マージしてしまい、どちらも残ります（`!override` は Docker Compose v2.24.0 以降）。
 
 ### 7-4. ビルドと起動
 
@@ -519,14 +512,14 @@ EOF
 
 ### 9-5. docker-compose.prod.yml にHTTPS追加
 
-nginx セクションを書き換え:
+nginx セクションを書き換え（雛形にコメントアウトで入っているので、コメントを外すだけでも構いません）:
 
 ```yaml
   nginx:
-    ports:
+    ports: !override
       - "80:80"
       - "443:443"
-    volumes:
+    volumes: !override
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - app_storage:/app/storage:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro

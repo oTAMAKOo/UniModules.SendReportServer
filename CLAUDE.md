@@ -1,4 +1,4 @@
-# SendReport Log Server
+# BugLogServer
 
 # プロジェクト共通ルール
 
@@ -13,6 +13,8 @@
 
 Unityクライアントからのクラッシュレポート（AES-256-CBC暗号化）を受信・管理するログサーバー。
 既存のDjango製ログサーバーをFastAPI + PostgreSQLで置き換えたスタンドアロン版。
+各プロジェクトへはサブモジュールとして取り込んで使う（導入手順は README.md）。
+送信側は Unity の UniModules にある `Modules/Devkit/Diagnosis/SendReport/`。
 
 ## 技術スタック
 
@@ -28,10 +30,12 @@ Unityクライアントからのクラッシュレポート（AES-256-CBC暗号�
 ## ディレクトリ構成
 
 ```
-log-server/
+BugLogServer/
+├── README.md               # 他プロジェクトへの導入手順
 ├── .env.example            # 環境変数テンプレート（.envは.gitignore対象）
 ├── Dockerfile
 ├── docker-compose.yml
+├── docker-compose.light.yml # 軽量ホスト向けoverride素材（0.5GB RAM）
 ├── requirements.txt
 ├── alembic.ini
 ├── alembic/
@@ -48,13 +52,15 @@ log-server/
 │   ├── crypto.py           # AES復号（DB設定 or .envフォールバック）
 │   ├── storage.py          # 画像保存（local/S3対応）
 │   ├── routers/
-│   │   ├── api.py          # POST /mgr/report/report — クライアントAPI
+│   │   ├── api.py          # POST /buglog/report — クライアントAPI
 │   │   └── admin.py        # 管理画面（ログイン, 一覧, 詳細, ユーザー管理, システム設定）
 │   ├── templates/          # Jinja2テンプレート（ダーク/ライトテーマ対応）
 │   └── static/icons/       # Unity Editor Icons（検索, コンソールアイコン）
 └── docs/
     ├── local_setup_guide.md     # ローカル環境構築手順
-    └── aws_deployment_guide.md  # AWS本番デプロイ手順
+    ├── aws_deployment_guide.md  # AWSデプロイ（構成の選択）
+    ├── aws_deploy_budget.md     # 安価版 t4g.nano の全手順
+    └── aws_deploy_standard.md   # 通常版 t4g.micro の全手順
 ```
 
 ## DBモデル
@@ -72,12 +78,14 @@ log-server/
 
 ## 管理画面の機能
 
-- **レポート一覧** (`/mgr/report/list`): 全文検索（ILIKE）、日付フィルタ、25件/ページ、カード型UI
-- **レポート詳細** (`/mgr/report/detail/{id}`): ログ表示（Unity風）、スクリーンショット、削除
-- **レポート管理** (`/mgr/report/manage`): 期間指定一括削除
-- **ユーザー管理** (`/mgr/users`): CRUD、権限変更ドロップダウン、有効/無効切替、PW変更（展開式）
-- **システム設定** (`/mgr/system`): AES Key/IV、セッション有効期限
-- **パスワード変更** (`/mgr/password_change`)
+URLプレフィックスは `/buglog`。`app/main.py` と `app/routers/admin.py` の `_PREFIX`、`app/routers/api.py` のURL組み立ての3箇所にハードコードされている（`.env` の `URL_PREFIX` は実装から参照されていない）。
+
+- **レポート一覧** (`/buglog/list`): 全文検索（ILIKE）、日付フィルタ、25件/ページ、カード型UI
+- **レポート詳細** (`/buglog/detail/{id}`): ログ表示（Unity風）、スクリーンショット、削除
+- **レポート管理** (`/buglog/manage`): 期間指定一括削除
+- **ユーザー管理** (`/buglog/users`): CRUD、権限変更ドロップダウン、有効/無効切替、PW変更（展開式）
+- **システム設定** (`/buglog/system`): AES Key/IV、セッション有効期限
+- **パスワード変更** (`/buglog/password_change`)
 - **テーマ切替**: ダーク/ライト（localStorage保存）
 
 ## セキュリティ機能
@@ -89,14 +97,13 @@ log-server/
 ## ローカル開発環境の起動
 
 ```bash
-cd log-server
 cp .env.example .env       # 必要に応じて値を変更
 docker compose build
 docker compose up -d
 docker compose exec app alembic upgrade head
 ```
 
-ブラウザ: http://127.0.0.1/mgr/login（admin / password）
+ブラウザ: http://127.0.0.1/buglog/login（admin / password）
 
 > `localhost` ではなく `127.0.0.1` を使用（Docker IPv4問題の回避）
 

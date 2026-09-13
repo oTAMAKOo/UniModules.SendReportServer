@@ -78,7 +78,7 @@ BugLogServer/
 
 ## 管理画面の機能
 
-URLプレフィックスは `/buglog`。`app/main.py` と `app/routers/admin.py` の `_PREFIX`、`app/routers/api.py` のURL組み立ての3箇所にハードコードされている（`.env` の `URL_PREFIX` は実装から参照されていない）。
+URLプレフィックスは `.env` の `URL_PREFIX` で設定する（既定値 `/buglog`、実装は `app/config.py` の `url_prefix`）。先頭の `/` は省略可、末尾の `/` は無視され、空にするとルート直下にマウントされる。テンプレートは Jinja2 グローバル変数 `{{ PREFIX }}` を参照する。以下のパスは既定値の場合。
 
 - **レポート一覧** (`/buglog/list`): 全文検索（ILIKE）、日付フィルタ、25件/ページ、カード型UI
 - **レポート詳細** (`/buglog/detail/{id}`): ログ表示（Unity風）、スクリーンショット、削除

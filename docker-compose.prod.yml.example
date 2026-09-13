@@ -1,0 +1,42 @@
+# 本番用 override のテンプレート。
+#
+# 使い方:
+#   cp docker-compose.prod.yml.example docker-compose.prod.yml
+#   # POSTGRES_PASSWORD を書き換えてから
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# 実ファイル docker-compose.prod.yml は DB パスワードを含むため .gitignore 対象。
+# 詳細な手順は docs/aws_deploy_standard.md（通常構成）または
+# docs/aws_deploy_budget.md（安価構成）の 7-3 を参照。
+
+services:
+  db:
+    environment:
+      # .env の DATABASE_URL に埋め込んだパスワードと同じ値にすること。
+      # 生成例: python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+      POSTGRES_PASSWORD: CHANGE_ME
+    # 開発用 compose が公開している 5432 を塞ぐ。
+    ports: []
+    restart: always
+
+  app:
+    volumes:
+      - app_storage:/app/storage
+    # 開発用の --reload を外す。
+    # --workers はホストのRAMに合わせる（0.5GB の安価構成は 1、1GB 以上なら 2）。
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    restart: always
+
+  nginx:
+    restart: always
+    # HTTPS を使う場合は以下のコメントを外す（証明書を certbot で取得済みであること）。
+    # 手順は docs/aws_deploy_standard.md の 9-5、または aws_deploy_budget.md の 9-5。
+    # ports:
+    #   - "80:80"
+    #   - "443:443"
+    # volumes:
+    #   - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    #   - app_storage:/app/storage:ro
+    #   - /etc/letsencrypt:/etc/letsencrypt:ro

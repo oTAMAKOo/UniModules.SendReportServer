@@ -9,6 +9,9 @@
 # Docker Compose override（デプロイ環境毎の設定）
 docker-compose.override.yml
 
+# 本番用 override（DBパスワードを含む。雛形は docker-compose.prod.yml.example）
+docker-compose.prod.yml
+
 # Python
 __pycache__/
 *.pyc

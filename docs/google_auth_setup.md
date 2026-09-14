@@ -75,7 +75,7 @@ GCP 側も更新する。
 
 `.env` は git 管理外。追記する場所は環境で異なる。
 
-- **ローカル**: プロジェクト側の `.env`（例: `Dominion/BugLogServer/.env`）
+- **ローカル**: 導入先プロジェクト側で `.env` を置いている場所（例: `<プロジェクト>/BugLogServer/.env`。本体を直接動かしているなら本体直下の `.env`）
 - **本番**: サーバーの配置先の `.env`（Lightsail なら `/home/ec2-user/log-server/.env`。プロジェクト側のラッパー compose は本番では使わない）
 
 ```dotenv

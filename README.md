@@ -103,3 +103,11 @@ AWS へのデプロイ手順は構成別に 3 種類ある。常時公開する�
 - テンプレートはダーク / ライト両テーマ対応（CSS 変数を使用）
 - アイコンは [Unity Editor Icons](https://github.com/halak/unity-editor-icons) から取得
 - フォント: Inter（Google Fonts）
+
+## ライセンス
+
+[MIT License](LICENSE)。
+
+`app/static/icons/` のアイコン画像は Unity Editor のアイコン（Unity Technologies の著作物）を
+[halak/unity-editor-icons](https://github.com/halak/unity-editor-icons) から取得したもので、
+本リポジトリのライセンスの対象外。

@@ -2,11 +2,11 @@
 {% block title %}管理メニュー - Log Server{% endblock %}
 {% block extra_css %}
 <style>
+    .menu-section { color: var(--text-secondary); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; margin: 24px 0 8px; }
     .menu-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
         gap: 16px;
-        margin-top: 20px;
     }
     .menu-card {
         background: var(--bg-table-td);
@@ -24,11 +24,15 @@
     }
     .menu-card h5 { margin-bottom: 8px; }
     .menu-card p { color: var(--text-secondary); font-size: 13px; margin: 0; }
+    .menu-card .menu-links { margin-top: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .menu-card .menu-links a { color: var(--accent); font-size: 12px; text-decoration: none; }
+    .menu-card .menu-links a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .menu-card .slug { color: var(--text-secondary); font-size: 12px; font-family: Consolas, 'Courier New', monospace; font-weight: 400; }
 </style>
 {% endblock %}
 {% block content %}
 <div class="page-header">
-    <a class="page-header-back" href="{{ PREFIX }}/list">レポート一覧</a>
+    <a class="page-header-back" href="{{ PREFIX }}/projects">プロジェクト一覧</a>
     <span class="page-header-sep">›</span>
     <span class="page-header-title">管理メニュー</span>
 </div>
@@ -41,19 +45,41 @@
         <h5>API トークン</h5>
         <p>Claude Code（MCP）や読み取り API からレポートを読むための個人トークン</p>
     </a>
-    {% if is_superuser %}
-    <a class="menu-card" href="{{ PREFIX }}/manage">
-        <h5>レポート管理</h5>
-        <p>期間指定の一括削除などレポートの管理操作</p>
+</div>
+
+{% if admin_projects %}
+<div class="menu-section">管理しているプロジェクト</div>
+<div class="menu-grid">
+    {% for p in admin_projects %}
+    <div class="menu-card">
+        <h5>{{ p.name }} <span class="slug">{{ p.slug }}</span></h5>
+        <p>メンバーの追加・役割変更、AES Key/IV の設定、期間指定の一括削除</p>
+        <div class="menu-links">
+            <a href="{{ project_url(p.slug, '/list') }}">レポート一覧</a>
+            <a href="{{ project_url(p.slug, '/users') }}">メンバー管理</a>
+            <a href="{{ project_url(p.slug, '/settings') }}">プロジェクト設定</a>
+            <a href="{{ project_url(p.slug, '/manage') }}">レポート管理</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if is_superuser %}
+<div class="menu-section">システム管理</div>
+<div class="menu-grid">
+    <a class="menu-card" href="{{ PREFIX }}/admin/projects">
+        <h5>プロジェクト管理</h5>
+        <p>プロジェクトの作成・表示名や slug の変更・受信の停止・削除</p>
     </a>
-    <a class="menu-card" href="{{ PREFIX }}/users">
-        <h5>ユーザー管理</h5>
-        <p>管理ユーザーの追加・削除・パスワードリセット</p>
+    <a class="menu-card" href="{{ PREFIX }}/admin/users">
+        <h5>全ユーザー管理</h5>
+        <p>全アカウントの作成・削除・有効/無効・システム管理者権限・パスワード・Google 連携</p>
     </a>
     <a class="menu-card" href="{{ PREFIX }}/system">
         <h5>システム</h5>
-        <p>AES暗号化キー・IVなどのシステム設定</p>
+        <p>セッション有効期限など全体共通の設定</p>
     </a>
-    {% endif %}
 </div>
+{% endif %}
 {% endblock %}

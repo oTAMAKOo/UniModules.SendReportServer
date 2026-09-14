@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}エラー - Log Server{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a class="page-header-back" href="{{ PREFIX }}/projects">プロジェクト一覧</a>
+    {% if project %}
+    <span class="page-header-sep">›</span>
+    <a class="page-header-back" href="{{ project_url(project.slug, '/list') }}">{{ project.name }}</a>
+    {% endif %}
+</div>
+<div class="alert alert-warning" style="max-width: 640px;">{{ message }}</div>
+{% endblock %}

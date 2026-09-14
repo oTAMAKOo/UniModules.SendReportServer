@@ -1,0 +1,211 @@
+{# ユーザー一覧 / メンバー一覧で共通のスタイル #}
+<style>
+    .container { max-width: 95vw; }
+    .dark-table {
+        width: 100%;
+        border-collapse: collapse;
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+    .dark-table th {
+        background-color: var(--bg-table-th);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        padding: 8px 12px;
+        font-weight: normal;
+        white-space: nowrap;
+    }
+    .dark-table td {
+        background-color: var(--bg-table-td);
+        border: 1px solid var(--border-color);
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    .add-form {
+        background: var(--bg-table-td);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+    .add-form .form-control {
+        background: var(--bg-log-odd);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+    .add-form .form-control:focus {
+        background: var(--bg-log-odd);
+        color: var(--text-primary);
+        border-color: #5a9fd4;
+        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
+    }
+    .add-form .form-label { color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; display: block; }
+    .add-form .form-check-label { color: var(--text-secondary); font-size: 13px; }
+    .add-form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .add-form-field { width: 200px; }
+    .add-form-field.auto { width: auto; }
+    .add-form-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: calc(1.5em * 0.875 + 0.5rem + 2px);
+    }
+    .add-form-hint {
+        color: var(--text-secondary);
+        font-size: 11px;
+        margin-top: 8px;
+    }
+    /* ログイン方法の選択 */
+    .login-method-group {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: calc(1.5em * 0.875 + 0.5rem + 2px);
+    }
+    .login-method-option {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-primary);
+        font-size: 13px;
+        cursor: pointer;
+        margin: 0;
+        white-space: nowrap;
+    }
+    .login-method-option input { margin: 0; cursor: pointer; }
+    .login-method-option.disabled { color: var(--text-secondary); cursor: not-allowed; }
+    .login-method-option.disabled input { cursor: not-allowed; }
+    .badge-super { background: #d4a017; color: #000; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+    .badge-general { background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+    .badge-active { background: #238636; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+    .badge-inactive { background: #6e4040; color: #f85149; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+    .badge-pending { background: #4a4520; color: #e3c95a; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+    .badge-method { display: inline-block; background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; margin: 1px 0; }
+    .badge-method.badge-google { background: #1f4f8a; color: #cfe3ff; }
+    .badge-method.badge-google.pending { background: #4a4520; color: #e3c95a; }
+    .badge-project { display: inline-block; background: #1f3a5a; color: #9ecbff; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 500; white-space: nowrap; margin: 1px 2px 1px 0; text-decoration: none; font-family: Consolas, 'Courier New', monospace; }
+    .badge-project:hover { background: #27507c; color: #cfe3ff; }
+    .badge-project.admin { background: #5a4a17; color: #e3c95a; }
+    .badge-project.admin:hover { background: #75611f; color: #f3dc7a; }
+    .badge-recovery { background: #4b3a6b; color: #d9c8f5; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+    .user-email { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+    .user-timestamps {
+        font-size: 11px;
+        color: #888;
+        white-space: nowrap;
+        text-align: right;
+        border-left: none !important;
+    }
+    .user-timestamps div { line-height: 1.6; }
+    .btn-sm { font-size: 12px; padding: 2px 10px; }
+    /* 補助操作（キャンセル・コピー）用の中立色。Bootstrap の outline-secondary は
+       ダークテーマ上で無効ボタンに見えるため、テーマ変数ベースで枠線をはっきりさせる */
+    .btn-outline-neutral {
+        color: var(--text-primary);
+        border: 1px solid var(--text-secondary);
+        background: transparent;
+    }
+    .btn-outline-neutral:hover {
+        color: var(--text-primary);
+        background: var(--bg-card-hover);
+        border-color: var(--text-primary);
+    }
+    /* Bootstrap の success 緑はダーク背景では沈んで見えるため、ダークテーマだけ明るい緑に */
+    [data-theme="dark"] .btn-outline-success {
+        --bs-btn-color: #3fb950;
+        --bs-btn-border-color: #3fb950;
+        --bs-btn-hover-bg: #3fb950;
+        --bs-btn-hover-border-color: #3fb950;
+        --bs-btn-hover-color: #000;
+    }
+    .alert { font-size: 14px; }
+    .reset-pw-input { width: 140px; display: inline-block; }
+    .pw-field-wrapper {
+        position: relative;
+    }
+    .pw-field-wrapper .form-control {
+        padding-right: 32px;
+    }
+    .pw-toggle-eye {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 2px;
+        line-height: 0;
+    }
+    .pw-toggle-eye:hover { color: var(--text-primary); }
+    .role-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        margin-top: 4px;
+        background: var(--bg-table-td);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10;
+        min-width: 150px;
+        padding: 4px 0;
+    }
+    .role-menu.open { display: block; }
+    .role-menu form { margin: 0; }
+    .role-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 12px;
+        border: none;
+        background: none;
+        color: var(--text-primary);
+        font-size: 13px;
+        cursor: pointer;
+        text-align: left;
+        white-space: nowrap;
+    }
+    .role-menu-item:hover {
+        background: var(--bg-card-hover, rgba(255,255,255,0.05));
+    }
+    /* 行内の展開式パネル（PW変更 / Google連携） */
+    .inline-panel {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        margin-top: 6px;
+    }
+    .inline-panel.open { display: flex; }
+    .inline-panel .form-control {
+        background: var(--bg-log-odd);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+    .inline-panel .form-control:focus {
+        background: var(--bg-log-odd);
+        color: var(--text-primary);
+        border-color: #5a9fd4;
+        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
+    }
+    .google-email-input { width: 230px; display: inline-block; }
+    /* 招待リンクの表示 */
+    .invite-panel { font-size: 13px; border-radius: 6px; }
+    .invite-url-row { display: flex; gap: 6px; margin-top: 8px; }
+    .invite-url-row .form-control {
+        font-family: Consolas, 'Courier New', monospace;
+        font-size: 12px;
+        background: rgba(0,0,0,0.15);
+        color: inherit;
+        border-color: rgba(0,0,0,0.2);
+    }
+    .invite-url-row .form-control:focus {
+        background: rgba(0,0,0,0.15);
+        color: inherit;
+        box-shadow: none;
+        border-color: rgba(0,0,0,0.3);
+    }
+</style>

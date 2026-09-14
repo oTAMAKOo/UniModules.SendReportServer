@@ -225,13 +225,16 @@ def _escape_cell(value: str) -> str:
     return value.replace("|", "\\|").replace("\r", "").replace("\n", " ")
 
 
-def search_reports_query(db: Session, q: str = "", date_from: str = "", date_to: str = "") -> Query:
+def search_reports_query(db: Session, q: str = "", date_from: str = "", date_to: str = "", *, project_id: int | None = None) -> Query:
     """管理画面の一覧と同じ条件でレポートを絞り込むクエリを返す（並び順は呼び出し側で付ける）。
 
+    project_id で所属プロジェクトに絞る（None は全プロジェクト。呼び出し側で認可済みの場合のみ）。
     q は全テキストフィールドへの ILIKE 部分一致。日付は YYYY-MM-DD で、date_to はその日を含む。
     形式が不正な日付は無視する（画面の挙動と同じ）。
     """
     query = db.query(ReportData)
+    if project_id is not None:
+        query = query.filter(ReportData.project_id == project_id)
 
     if q and q.strip():
         like_pattern = f"%{q.strip()}%"

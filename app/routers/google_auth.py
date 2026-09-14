@@ -31,6 +31,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import AdminUser
 from app.ratelimit import oauth_limiter
+from app.authz import post_login_path
 from app.routers.common import redirect
 from app.templating import templates
 
@@ -176,7 +177,7 @@ async def google_callback(
     db.commit()
     logger.info("Google ログイン成功: user=%s", user.username)
 
-    response = redirect("/list")
+    response = redirect(post_login_path(db, user))
     response.set_cookie(
         SESSION_COOKIE,
         create_session_token(user.username),

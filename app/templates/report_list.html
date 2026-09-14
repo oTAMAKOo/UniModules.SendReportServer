@@ -238,9 +238,12 @@
 </style>
 {% endblock %}
 {% block content %}
+{% if error %}
+<div class="alert alert-warning" style="font-size:14px;">{{ error }}</div>
+{% endif %}
 <div class="list-header">
-    <h2>レポート一覧</h2>
-    <form method="get" action="{{ PREFIX }}/list" class="search-bar">
+    <h2>{{ project.name }} <span style="color:var(--text-secondary); font-size:14px; font-weight:400;">レポート一覧</span></h2>
+    <form method="get" action="{{ project_url(project.slug, '/list') }}" class="search-bar">
         <div class="search-input-wrap">
             <img src="/static/icons/d_search.png" alt="" class="search-icon-img">
             <input type="text" class="search-input" name="q" value="{{ q }}" placeholder="全文検索">
@@ -249,7 +252,7 @@
         <span class="sep">~</span>
         <input type="date" class="date-input" name="date_to" value="{{ date_to }}">
         <button type="submit" class="btn-search">検索</button>
-        {% if q or date_from or date_to %}<a href="{{ PREFIX }}/list" class="btn-clear">クリア</a>{% endif %}
+        {% if q or date_from or date_to %}<a href="{{ project_url(project.slug, '/list') }}" class="btn-clear">クリア</a>{% endif %}
     </form>
 </div>
 
@@ -262,7 +265,7 @@
 
 <div class="report-list-card">
     {% for r in reports %}
-    <a class="report-row" href="{{ PREFIX }}/detail/{{ r.id }}">
+    <a class="report-row" href="{{ project_url(project.slug, '/detail/' ~ r.id) }}">
         {% if r.thumb_url %}
         <img class="report-thumb" src="{{ r.thumb_url }}" alt="">
         {% else %}

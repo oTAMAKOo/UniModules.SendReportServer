@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}プロジェクト管理 - Log Server{% endblock %}
+{% block extra_css %}
+<style>
+    .container { max-width: 95vw; }
+    .dark-table { width: 100%; border-collapse: collapse; color: var(--text-primary); font-size: 14px; }
+    .dark-table th { background-color: var(--bg-table-th); color: var(--text-secondary); border: 1px solid var(--border-color); padding: 8px 12px; font-weight: normal; white-space: nowrap; }
+    .dark-table td { background-color: var(--bg-table-td); border: 1px solid var(--border-color); padding: 8px 12px; vertical-align: middle; }
+    .add-form { background: var(--bg-table-td); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    .add-form .form-label { color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; display: block; }
+    .add-form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+    .add-form-field { width: 200px; }
+    .add-form-field.wide { width: 320px; }
+    .add-form-hint { color: var(--text-secondary); font-size: 11px; margin-top: 8px; }
+    .dark-table .form-control, .add-form .form-control {
+        background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);
+    }
+    .dark-table .form-control:focus, .add-form .form-control:focus {
+        background: var(--bg-log-odd); color: var(--text-primary); border-color: #5a9fd4; box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
+    }
+    .mono { font-family: Consolas, 'Courier New', monospace; }
+    .row-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .row-form .form-control-sm { width: 160px; }
+    .row-form .form-check-label { color: var(--text-secondary); font-size: 13px; }
+    .badge-active { background: #238636; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 4px; white-space: nowrap; }
+    .badge-inactive { background: #6e4040; color: #f85149; font-size: 11px; padding: 3px 10px; border-radius: 4px; white-space: nowrap; }
+    .btn-sm { font-size: 12px; padding: 2px 10px; }
+    .alert { font-size: 14px; }
+    .link-list a { color: var(--accent); text-decoration: none; font-size: 12px; margin-right: 8px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a class="page-header-back" href="{{ PREFIX }}/admin">管理メニュー</a>
+    <span class="page-header-sep">›</span>
+    <span class="page-header-title">プロジェクト管理</span>
+</div>
+
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+{% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+
+<div class="add-form">
+    <h6 style="color: var(--text-secondary); margin-bottom: 12px;">新規プロジェクト</h6>
+    <form method="post" action="{{ PREFIX }}/admin/projects/create">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="add-form-row">
+            <div class="add-form-field">
+                <label class="form-label">slug（URL 用）</label>
+                <input type="text" class="form-control form-control-sm mono" name="slug" required pattern="[a-z0-9][a-z0-9-]{1,39}" placeholder="my-game" title="小文字英数字とハイフン、2〜40 文字">
+            </div>
+            <div class="add-form-field">
+                <label class="form-label">表示名</label>
+                <input type="text" class="form-control form-control-sm" name="name" required maxlength="100" placeholder="My Game">
+            </div>
+            <div class="add-form-field wide">
+                <label class="form-label">AES Key（32 文字）</label>
+                <input type="text" class="form-control form-control-sm mono" name="aes_key" value="{{ new_aes_key }}" required minlength="32" maxlength="32">
+            </div>
+            <div class="add-form-field">
+                <label class="form-label">AES IV（16 文字）</label>
+                <input type="text" class="form-control form-control-sm mono" name="aes_iv" value="{{ new_aes_iv }}" required minlength="16" maxlength="16">
+            </div>
+            <div class="add-form-field" style="width:auto;">
+                <button type="submit" class="btn btn-primary btn-sm">作成</button>
+            </div>
+        </div>
+        <div class="add-form-hint">※ 受信 URL は <span class="mono">&lt;PUBLIC_BASE_URL&gt;{{ PREFIX }}/report/&lt;slug&gt;</span> になります。AES Key / IV はランダムに生成済みで、後からプロジェクト設定で変更できます。Unity クライアント側の鍵を同じ値にしてください</div>
+    </form>
+</div>
+
+<table class="dark-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>slug / 表示名 / 受信</th>
+            <th>レポート</th>
+            <th>メンバー</th>
+            <th>作成日</th>
+            <th>リンク</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in rows %}
+        <tr>
+            <td>{{ r.project.id }}</td>
+            <td>
+                <form method="post" action="{{ PREFIX }}/admin/projects/{{ r.project.id }}/update" class="row-form" data-slug="{{ r.project.slug }}" onsubmit="return confirmUpdate(this)">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="text" class="form-control form-control-sm mono" name="slug" value="{{ r.project.slug }}" required pattern="[a-z0-9][a-z0-9-]{1,39}" title="変更すると受信 URL と共有済みのリンクが壊れます">
+                    <input type="text" class="form-control form-control-sm" name="name" value="{{ r.project.name }}" required maxlength="100">
+                    <div class="form-check" style="margin:0;">
+                        <input type="checkbox" class="form-check-input" name="is_active" value="true" id="active-{{ r.project.id }}"{% if r.project.is_active %} checked{% endif %}>
+                        <label class="form-check-label" for="active-{{ r.project.id }}">受信を有効にする</label>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary btn-sm">更新</button>
+                    {% if r.project.is_active %}<span class="badge-active">受信中</span>{% else %}<span class="badge-inactive">受信停止</span>{% endif %}
+                </form>
+            </td>
+            <td>{{ r.report_count }} 件</td>
+            <td>{{ r.member_count }} 人</td>
+            <td style="white-space:nowrap;">{{ r.project.created_at.strftime('%Y-%m-%d') }}</td>
+            <td class="link-list" style="white-space:nowrap;">
+                <a href="{{ project_url(r.project.slug, '/list') }}">一覧</a>
+                <a href="{{ project_url(r.project.slug, '/users') }}">メンバー</a>
+                <a href="{{ project_url(r.project.slug, '/settings') }}">設定</a>
+                <a href="{{ project_url(r.project.slug, '/manage') }}">一括削除</a>
+            </td>
+            <td>
+                <form method="post" action="{{ PREFIX }}/admin/projects/{{ r.project.id }}/delete" data-name="{{ r.project.name }}" onsubmit="return confirm('プロジェクト「' + this.dataset.name + '」を削除しますか？メンバーの所属も消えます（ユーザーアカウントは残ります）')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm"{% if r.report_count %} disabled title="レポートが残っているため削除できません。先に一括削除してください"{% endif %}>削除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+{% block extra_js %}
+<script>
+function confirmUpdate(form) {
+    var newSlug = form.querySelector('input[name="slug"]').value;
+    if (newSlug !== form.dataset.slug) {
+        return confirm('slug を「' + form.dataset.slug + '」から「' + newSlug + '」に変更します。\n受信 URL が変わるため Unity クライアントの送信先を更新する必要があり、共有済みの詳細ページ URL も開けなくなります。\n変更しますか？');
+    }
+    return true;
+}
+</script>
+{% endblock %}

@@ -29,7 +29,7 @@
 {% endblock %}
 {% block content %}
 <div class="page-header">
-    <a class="page-header-back" href="{{ PREFIX }}/admin">管理メニュー</a>
+    <a class="page-header-back" href="{{ project_url(project.slug, '/list') }}">{{ project.name }}</a>
     <span class="page-header-sep">›</span>
     <span class="page-header-title">レポート管理</span>
 </div>
@@ -41,11 +41,11 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
-<div class="stat-text">現在のレポート数: {{ total_count }} 件</div>
+<div class="stat-text">{{ project.name }} のレポート数: {{ total_count }} 件</div>
 
 <div class="manage-section">
     <h5>期間指定 一括削除</h5>
-    <form method="post" action="{{ PREFIX }}/manage/bulk_delete" onsubmit="return confirm('指定期間のレポートを一括削除します。この操作は取り消せません。実行しますか？')">
+    <form method="post" action="{{ project_url(project.slug, '/manage/bulk_delete') }}" onsubmit="return confirm('指定期間のレポートを一括削除します。この操作は取り消せません。実行しますか？')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="row mb-3">
             <div class="col">

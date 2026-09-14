@@ -1,0 +1,22 @@
+{# 招待リンク発行結果（invite 変数）の表示 #}
+{% if invite %}
+<div class="alert alert-success invite-panel">
+    <strong>{{ invite.username }}</strong>（{{ invite.email }}）への招待リンクを発行しました。
+    {% if invite.note %}<br>{{ invite.note }}{% endif %}
+    {% if invite.mail_sent %}
+    招待メールを送信しました。届かない場合は以下のリンクを直接伝えてください。
+    {% elif invite.mail_error %}
+    <span class="text-danger">招待メールの送信に失敗しました（{{ invite.mail_error }}）。</span>以下のリンクを直接伝えてください。
+    {% else %}
+    以下のリンクを本人に伝えてください。
+    {% endif %}
+    <div class="invite-url-row">
+        <input type="text" class="form-control form-control-sm" id="invite-url" value="{{ invite.url }}" readonly onclick="this.select()">
+        <button type="button" class="btn btn-outline-neutral btn-sm" style="white-space:nowrap;" onclick="copyInviteUrl(this)">コピー</button>
+    </div>
+    <div class="add-form-hint" style="margin-top:6px;">
+        有効期限 {{ invite.expire_hours }} 時間。本人が招待された Google アカウントでログインすると有効化されます。
+        期限が切れても、登録済みの Google アカウントならログイン画面の「Google でログイン」から入れます。
+    </div>
+</div>
+{% endif %}

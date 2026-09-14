@@ -180,6 +180,27 @@
             transition: transform 0.2s;
         }
         .theme-switch.active::after { transform: translateX(16px); }
+        /* プロジェクト切替 */
+        .nav-project-wrap { position: relative; margin-left: 14px; }
+        .nav-project-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #e1e4e8;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .nav-project-btn:hover { background: rgba(255,255,255,0.12); }
+        .nav-project-btn .chev { font-size: 10px; opacity: 0.7; }
+        .nav-project-wrap .nav-dropdown { left: 0; right: auto; min-width: 240px; }
+        .nav-project-item { justify-content: space-between; }
+        .nav-project-item.active { color: var(--text-primary); font-weight: 600; }
+        .nav-role-badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: #3d4450; color: #c9d1d9; }
+        .nav-role-badge.admin { background: #d4a017; color: #000; }
         /* ログアウト赤 */
         .nav-dropdown-item.logout-item:hover { color: #f85149; }
         .nav-dropdown-item.logout-item:hover svg { opacity: 1; stroke: #f85149; }
@@ -212,7 +233,24 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="{{ PREFIX }}/list">Log Server</a>
+            <a class="navbar-brand" href="{{ PREFIX }}/projects">Log Server</a>
+            {% if user and current_project %}
+            <div class="nav-project-wrap">
+                <button type="button" class="nav-project-btn" onclick="toggleProjectMenu()" title="プロジェクトを切り替える">
+                    {{ current_project.name }} <span class="chev">&#9662;</span>
+                </button>
+                <div class="nav-dropdown" id="nav-project-dropdown">
+                    {% for p, r in nav_projects %}
+                    <a class="nav-dropdown-item nav-project-item{% if p.id == current_project.id %} active{% endif %}" href="{{ project_url(p.slug, '/list') }}">
+                        <span>{{ p.name }}</span>
+                        <span class="nav-role-badge{% if r == 'admin' %} admin{% endif %}">{% if r == 'admin' %}管理者{% else %}メンバー{% endif %}</span>
+                    </a>
+                    {% endfor %}
+                    <div class="nav-dropdown-divider"></div>
+                    <a class="nav-dropdown-item" href="{{ PREFIX }}/projects">すべてのプロジェクト</a>
+                </div>
+            </div>
+            {% endif %}
             <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
                 {% if user %}
                 <div class="nav-user-wrap">
@@ -220,8 +258,23 @@
                     <div class="nav-dropdown" id="nav-dropdown">
                         <div class="nav-dropdown-header">
                             {{ user }}
-                            <small>ログイン中</small>
+                            <small>ログイン中{% if current_project %} · {{ current_project.name }}{% endif %}</small>
                         </div>
+                        {% if current_project and current_role == 'admin' %}
+                        <a class="nav-dropdown-item" href="{{ project_url(current_project.slug, '/users') }}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            メンバー管理
+                        </a>
+                        <a class="nav-dropdown-item" href="{{ project_url(current_project.slug, '/settings') }}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            プロジェクト設定
+                        </a>
+                        <a class="nav-dropdown-item" href="{{ project_url(current_project.slug, '/manage') }}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                            レポート管理
+                        </a>
+                        <div class="nav-dropdown-divider"></div>
+                        {% endif %}
                         <a class="nav-dropdown-item" href="{{ PREFIX }}/admin">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                             管理メニュー
@@ -266,12 +319,24 @@
     }
     function toggleUserMenu() {
         var dd = document.getElementById('nav-dropdown');
+        var pd = document.getElementById('nav-project-dropdown');
+        if (pd) pd.classList.remove('open');
         dd.classList.toggle('open');
+    }
+    function toggleProjectMenu() {
+        var pd = document.getElementById('nav-project-dropdown');
+        var dd = document.getElementById('nav-dropdown');
+        if (dd) dd.classList.remove('open');
+        pd.classList.toggle('open');
     }
     document.addEventListener('click', function(e) {
         var wrap = document.querySelector('.nav-user-wrap');
         if (wrap && !wrap.contains(e.target)) {
             document.getElementById('nav-dropdown').classList.remove('open');
+        }
+        var pwrap = document.querySelector('.nav-project-wrap');
+        if (pwrap && !pwrap.contains(e.target)) {
+            document.getElementById('nav-project-dropdown').classList.remove('open');
         }
     });
     function updateIcons(theme) {

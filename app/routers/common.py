@@ -19,6 +19,7 @@ from app.auth import (
     generate_csrf_token,
     get_session_max_age,
     hash_password,
+    normalize_email,
     verify_csrf_token,
     verify_session_token,
 )
@@ -132,6 +133,57 @@ async def issue_invite(target: AdminUser, note: str | None = None) -> dict:
         except MailError as e:
             result["mail_error"] = str(e)
     return result
+
+
+def create_user(
+    db: Session,
+    *,
+    username: str,
+    login_method: str,
+    password: str = "",
+    email: str = "",
+    is_superuser: bool = False,
+) -> tuple[AdminUser | None, str | None]:
+    """ユーザーを作成して (user, None) を返す。入力に問題があれば (None, エラー文)。
+
+    login_method が "password" ならパスワードユーザー（空なら "password"）。
+    "google" なら email だけを持つ招待中ユーザー（is_active=False）を作る。招待リンクの発行は
+    呼び出し側（issue_invite）で行う。commit はここで行う。
+    全ユーザー管理（システム管理者）とプロジェクトのメンバー管理（プロジェクト管理者）で共用する。
+    """
+    username = username.strip()
+    if len(username) < 1 or len(username) > 64:
+        return None, "ユーザー名は1〜64文字で入力してください"
+
+    if db.query(AdminUser).filter(AdminUser.username == username).first():
+        return None, f"ユーザー名 '{username}' は既に存在します"
+
+    if login_method == "google":
+        if not settings.google_enabled:
+            return None, "Google ログインが設定されていないため、Google ユーザーは作成できません（.env の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL）"
+        email = normalize_email(email)
+        if not email or not is_valid_email(email):
+            return None, "メールアドレスの形式が正しくありません"
+        if db.query(AdminUser).filter(AdminUser.email == email).first():
+            return None, f"メールアドレス '{email}' は既に登録されています"
+        new_user = AdminUser(username=username, password_hash=None, email=email, is_superuser=is_superuser, is_active=False)
+        db.add(new_user)
+        db.commit()
+        return new_user, None
+
+    if login_method != "password":
+        return None, "ログイン方法が不正です"
+
+    # パスワード未入力時はデフォルト値を設定
+    if not password:
+        password = "password"
+    if len(password) < 4:
+        return None, "パスワードは4文字以上で入力してください"
+
+    new_user = AdminUser(username=username, password_hash=hash_password(password), is_superuser=is_superuser)
+    db.add(new_user)
+    db.commit()
+    return new_user, None
 
 
 def get_config_value(db: Session, key: str, default: str) -> str:

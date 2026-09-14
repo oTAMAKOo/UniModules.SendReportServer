@@ -9,7 +9,7 @@ from app.database import SessionLocal
 from app import mcp_server
 from app.authz import RedirectException
 from app.routers.common import redirect
-from app.routers import api, admin, google_auth, reports_api
+from app.routers import api, admin, google_auth, project_pages, reports_api, system_admin
 
 
 @asynccontextmanager
@@ -38,6 +38,8 @@ async def _redirect_exception_handler(request, exc: RedirectException):
 
 app.include_router(api.router, prefix=settings.url_prefix)
 app.include_router(admin.router, prefix=settings.url_prefix)
+app.include_router(project_pages.router, prefix=settings.url_prefix)
+app.include_router(system_admin.router, prefix=settings.url_prefix)
 app.include_router(google_auth.router, prefix=settings.url_prefix)
 app.include_router(reports_api.router, prefix=settings.url_prefix)
 

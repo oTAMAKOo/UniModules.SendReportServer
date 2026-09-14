@@ -1,0 +1,89 @@
+{# ユーザー一覧 / メンバー一覧で共通のスクリプト（展開パネル・権限メニュー・招待リンクコピー・パスワード表示） #}
+<script>
+function toggleRoleMenu(btn) {
+    var menu = btn.nextElementSibling;
+    var isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.role-menu.open').forEach(function(m) { m.classList.remove('open'); });
+    if (!isOpen) menu.classList.add('open');
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.role-dropdown')) {
+        document.querySelectorAll('.role-menu.open').forEach(function(m) { m.classList.remove('open'); });
+    }
+});
+function closeAllPanels() {
+    document.querySelectorAll('.inline-panel.open').forEach(function(p) {
+        p.classList.remove('open');
+        var pw = p.querySelector('input[name="new_password"]');
+        if (pw) {
+            pw.value = '';
+            p.querySelector('button[type="submit"]').disabled = true;
+        }
+        var email = p.querySelector('input[name="email"]');
+        if (email) email.value = email.defaultValue;
+    });
+}
+function togglePanel(btn, selector) {
+    var panel = btn.closest('td').querySelector(selector);
+    var wasOpen = panel.classList.contains('open');
+    closeAllPanels();
+    if (!wasOpen) {
+        panel.classList.add('open');
+        var input = panel.querySelector('input:not([type="hidden"])');
+        if (input && !input.disabled) input.focus();
+    }
+}
+function updatePwBtn(input) {
+    var btn = input.closest('.pw-reset-panel').querySelector('button[type="submit"]');
+    btn.disabled = input.value.length < 4;
+}
+function unlinkGoogle(btn) {
+    // ユーザー名は JS 文字列に直接埋め込まず data 属性から読む（HTML エスケープでは JS 文字列を守れないため）
+    var username = btn.form.dataset.username;
+    if (!confirm(username + ' の Google 連携を解除しますか？\nこのユーザーは Google でログインできなくなります。')) return false;
+    // 空の email を送ると連携解除になる（サーバー側で判定）
+    btn.form.querySelector('input[name="email"]').value = '';
+    return true;
+}
+function updateLoginMethod() {
+    var checked = document.querySelector('input[name="login_method"]:checked');
+    var isGoogle = checked && checked.value === 'google';
+    document.getElementById('add-field-password').hidden = isGoogle;
+    document.getElementById('add-field-email').hidden = !isGoogle;
+    document.getElementById('add-hint-password').hidden = isGoogle;
+    document.getElementById('add-hint-google').hidden = !isGoogle;
+    document.getElementById('add-email').required = isGoogle;
+}
+updateLoginMethod();
+function copyInviteUrl(btn) {
+    var input = document.getElementById('invite-url');
+    var done = function() {
+        btn.textContent = 'コピーしました';
+        setTimeout(function() { btn.textContent = 'コピー'; }, 1500);
+    };
+    var fallback = function() {
+        input.select();
+        document.execCommand('copy');
+        done();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(done, fallback);
+    } else {
+        fallback();
+    }
+}
+function togglePasswordVisibility(inputId, btn) {
+    var input = document.getElementById(inputId);
+    var eyeIcon = btn.querySelector('.eye-icon');
+    var eyeOffIcon = btn.querySelector('.eye-off-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        eyeIcon.style.display = 'none';
+        eyeOffIcon.style.display = 'inline';
+    } else {
+        input.type = 'password';
+        eyeIcon.style.display = 'inline';
+        eyeOffIcon.style.display = 'none';
+    }
+}
+</script>

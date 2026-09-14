@@ -251,7 +251,9 @@
     <h4>Claude Code での使い方</h4>
     <p>各メンバーは、トークンを発行して緑の枠のコマンドを実行するだけです（環境変数 <code>BUGLOG_TOKEN</code> に保存されます）。
        MCP サーバーの登録はプロジェクトの <code>.mcp.json</code> で一度だけ行い、チームで共有します。
-       あとはレポートの URL（<code>{{ PREFIX }}/detail/…</code>）を Claude に貼るだけで、Claude が <code>get_report</code> ツールでログ全文を読みます。
+       あとはレポートの URL（<code>{{ PREFIX }}/p/&lt;slug&gt;/detail/…</code>）を Claude に貼るだけで、Claude が <code>get_report</code> ツールでログ全文を読みます。
+       トークン 1 つで参加している全プロジェクト{% if project_slugs %}（{{ project_slugs | join(', ') }}）{% endif %}のレポートを読めます。
+       検索（<code>search_reports</code> / <code>list_recent_reports</code>）は参加プロジェクトが 2 つ以上あるとき <code>project</code>（slug）の指定が必要です（1 つなら省略可）。
        手順の詳細はリポジトリの <code>docs/claude_integration.md</code> にあります。</p>
     {% if mcp_enabled %}
     <div class="snippet-head">

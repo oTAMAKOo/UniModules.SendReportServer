@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}メンバー管理 - {{ project.name }} - Log Server{% endblock %}
+{% block extra_css %}
+{% include "_user_styles.html" %}
+<style>
+    .role-select { width: auto; display: inline-block; background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a class="page-header-back" href="{{ project_url(project.slug, '/list') }}">{{ project.name }}</a>
+    <span class="page-header-sep">›</span>
+    <span class="page-header-title">メンバー管理</span>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+{% if message %}
+<div class="alert alert-success">{{ message }}</div>
+{% endif %}
+{% include "_invite_panel.html" %}
+
+<div class="add-form">
+    <h6 style="color: var(--text-secondary); margin-bottom: 12px;">既存ユーザーを追加</h6>
+    <form method="post" action="{{ project_url(project.slug, '/users/add') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="add-form-row">
+            <div class="add-form-field" style="width:260px;">
+                <label class="form-label">ユーザー名 または メールアドレス</label>
+                <input type="text" class="form-control form-control-sm" name="identifier" required placeholder="username / user@example.com" autocomplete="off">
+            </div>
+            <div class="add-form-field auto">
+                <label class="form-label">役割</label>
+                <select class="form-select form-select-sm role-select" name="role">
+                    <option value="member" selected>メンバー</option>
+                    <option value="admin">プロジェクト管理者</option>
+                </select>
+            </div>
+            <div class="add-form-field auto">
+                <label class="form-label">&nbsp;</label>
+                <div class="add-form-controls">
+                    <button type="submit" class="btn btn-primary btn-sm">追加</button>
+                </div>
+            </div>
+        </div>
+        <div class="add-form-hint">※ 他のプロジェクトで既にアカウントを持っている人はこちら。アカウントが無い人は下から新規作成します</div>
+    </form>
+</div>
+
+<div class="add-form">
+    <h6 style="color: var(--text-secondary); margin-bottom: 12px;">新規ユーザーを作成してメンバーに追加</h6>
+    <form method="post" action="{{ project_url(project.slug, '/users/create') }}" id="add-user-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="add-form-row">
+            <div class="add-form-field">
+                <label class="form-label">ユーザー名</label>
+                <input type="text" class="form-control form-control-sm" name="username" required>
+            </div>
+            <div class="add-form-field auto">
+                <label class="form-label">ログイン方法</label>
+                <div class="login-method-group">
+                    <label class="login-method-option">
+                        <input type="radio" name="login_method" value="password" checked onchange="updateLoginMethod()"> パスワード
+                    </label>
+                    <label class="login-method-option{% if not GOOGLE_ENABLED %} disabled{% endif %}"{% if not GOOGLE_ENABLED %} title="Google ログインが未設定です（.env の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL）"{% endif %}>
+                        <input type="radio" name="login_method" value="google" onchange="updateLoginMethod()"{% if not GOOGLE_ENABLED %} disabled{% endif %}> Google
+                    </label>
+                </div>
+            </div>
+            <div class="add-form-field" id="add-field-password">
+                <label class="form-label">パスワード</label>
+                <div class="pw-field-wrapper">
+                    <input type="password" class="form-control form-control-sm" name="password" id="add-password" minlength="4" placeholder="password">
+                    <button type="button" class="pw-toggle-eye" onclick="togglePasswordVisibility('add-password', this)" tabindex="-1" title="パスワードを表示">
+                        <svg class="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="eye-off-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="add-form-field" id="add-field-email" style="width:260px;" hidden>
+                <label class="form-label">Email（Google アカウント）</label>
+                <input type="email" class="form-control form-control-sm" name="email" id="add-email" placeholder="user@gmail.com" autocomplete="off">
+            </div>
+            <div class="add-form-field auto">
+                <label class="form-label">&nbsp;</label>
+                <div class="add-form-controls">
+                    <button type="submit" class="btn btn-primary btn-sm">作成して追加</button>
+                </div>
+            </div>
+        </div>
+        <div class="add-form-hint" id="add-hint-password">※ パスワード空欄の場合「password」が設定されます。作成したユーザーはこのプロジェクトのメンバーになります</div>
+        <div class="add-form-hint" id="add-hint-google" hidden>※ 招待リンクが発行されます。本人がリンクから上記の Google アカウントでログインすると有効になります</div>
+    </form>
+</div>
+
+<table class="dark-table">
+    <thead>
+        <tr>
+            <th>ユーザー名</th>
+            <th>Email</th>
+            <th>ログイン方法</th>
+            <th>役割</th>
+            <th>状態</th>
+            <th>操作</th>
+            <th style="text-align:right; border-left:none;"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in members %}
+        {% set u = m.user %}
+        <tr>
+            <td>{{ u.username }}{% if u.is_superuser %} <span class="badge-recovery" title="システム管理者（全プロジェクトを管理できる）">SYS</span>{% endif %}</td>
+            <td class="user-email">{{ u.email or '—' }}</td>
+            <td>
+                {% if u.has_password %}<span class="badge-method">パスワード</span>{% endif %}
+                {% if u.has_google %}
+                <span class="badge-method badge-google{% if not u.google_sub %} pending{% endif %}" title="{% if u.google_sub %}Google アカウント連携済み{% else %}初回 Google ログイン待ち（リンクからログインすると連携されます）{% endif %}">Google{% if not u.google_sub %}（未連携）{% endif %}</span>
+                {% endif %}
+                {% if not u.has_password and not u.has_google %}<span style="color:var(--text-secondary);">—</span>{% endif %}
+            </td>
+            <td>
+                {% if m.membership.role == 'admin' %}<span class="badge-super">プロジェクト管理者</span>{% else %}<span class="badge-general">メンバー</span>{% endif %}
+            </td>
+            <td>
+                {% if u.is_invite_pending %}
+                <span class="badge-pending" title="本人が招待リンクから Google でログインすると有効になります">招待中</span>
+                {% elif u.is_active %}<span class="badge-active">有効</span>{% else %}<span class="badge-inactive" title="アカウントが無効化されています（システム管理者が全ユーザー管理で有効化できます）">無効</span>{% endif %}
+            </td>
+            <td>
+                {% if u.username != user %}
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <div class="role-dropdown" style="display:inline-block; position:relative;">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleRoleMenu(this)">役割変更</button>
+                        <div class="role-menu">
+                            <form method="post" action="{{ project_url(project.slug, '/users/role/' ~ u.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                {% if m.membership.role == 'admin' %}
+                                <input type="hidden" name="role" value="member">
+                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' をメンバーに変更しますか？')">
+                                    <span class="badge-general" style="display:inline-block;">メンバー</span> に変更
+                                </button>
+                                {% else %}
+                                <input type="hidden" name="role" value="admin">
+                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' をプロジェクト管理者にしますか？')">
+                                    <span class="badge-super" style="display:inline-block;">管理者</span> に変更
+                                </button>
+                                {% endif %}
+                            </form>
+                        </div>
+                    </div>
+                    {% if u.has_google and not u.google_sub %}
+                    <form method="post" action="{{ project_url(project.slug, '/users/reinvite/' ~ u.id) }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-outline-info btn-sm" style="white-space:nowrap;">招待リンク再発行</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="{{ project_url(project.slug, '/users/remove/' ~ u.id) }}" style="display:inline;" data-username="{{ u.username }}" onsubmit="return confirm('「' + this.dataset.username + '」をこのプロジェクトから外しますか？（アカウントは削除されません）')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">プロジェクトから外す</button>
+                    </form>
+                </div>
+                {% else %}
+                <span style="color:var(--text-secondary); font-size:12px;">(自分)</span>
+                {% endif %}
+            </td>
+            <td class="user-timestamps">
+                <div>参加: {{ m.membership.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                <div>最終ログイン: {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') if u.last_login_at else '—' }}</div>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="color:var(--text-secondary); text-align:center;">メンバーがいません</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<div class="add-form-hint" style="margin-top:10px;">
+    ※ システム管理者は所属していなくても全プロジェクトを管理できるため、この一覧には出ないことがあります。
+    アカウントの削除・有効/無効・パスワードリセット・Google 連携の変更はシステム管理者が
+    {% if current_user and current_user.is_superuser %}<a href="{{ PREFIX }}/admin/users">全ユーザー管理</a>{% else %}全ユーザー管理{% endif %}で行います。
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include "_user_scripts.html" %}
+{% endblock %}

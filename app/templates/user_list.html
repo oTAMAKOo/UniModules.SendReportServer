@@ -1,218 +1,13 @@
 {% extends "base.html" %}
-{% block title %}ユーザー管理 - Log Server{% endblock %}
+{% block title %}全ユーザー管理 - Log Server{% endblock %}
 {% block extra_css %}
-<style>
-    .container { max-width: 95vw; }
-    .dark-table {
-        width: 100%;
-        border-collapse: collapse;
-        color: var(--text-primary);
-        font-size: 14px;
-    }
-    .dark-table th {
-        background-color: var(--bg-table-th);
-        color: var(--text-secondary);
-        border: 1px solid var(--border-color);
-        padding: 8px 12px;
-        font-weight: normal;
-        white-space: nowrap;
-    }
-    .dark-table td {
-        background-color: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        padding: 8px 12px;
-        vertical-align: middle;
-    }
-    .add-form {
-        background: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 20px;
-    }
-    .add-form .form-control {
-        background: var(--bg-log-odd);
-        border-color: var(--border-color);
-        color: var(--text-primary);
-    }
-    .add-form .form-control:focus {
-        background: var(--bg-log-odd);
-        color: var(--text-primary);
-        border-color: #5a9fd4;
-        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
-    }
-    .add-form .form-label { color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; display: block; }
-    .add-form .form-check-label { color: var(--text-secondary); font-size: 13px; }
-    .add-form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-    .add-form-field { width: 200px; }
-    .add-form-field.auto { width: auto; }
-    .add-form-controls {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        height: calc(1.5em * 0.875 + 0.5rem + 2px);
-    }
-    .add-form-hint {
-        color: var(--text-secondary);
-        font-size: 11px;
-        margin-top: 8px;
-    }
-    /* ログイン方法の選択 */
-    .login-method-group {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        height: calc(1.5em * 0.875 + 0.5rem + 2px);
-    }
-    .login-method-option {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        color: var(--text-primary);
-        font-size: 13px;
-        cursor: pointer;
-        margin: 0;
-        white-space: nowrap;
-    }
-    .login-method-option input { margin: 0; cursor: pointer; }
-    .login-method-option.disabled { color: var(--text-secondary); cursor: not-allowed; }
-    .login-method-option.disabled input { cursor: not-allowed; }
-    .badge-super { background: #d4a017; color: #000; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
-    .badge-general { background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-active { background: #238636; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-inactive { background: #6e4040; color: #f85149; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-pending { background: #4a4520; color: #e3c95a; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-method { display: inline-block; background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; margin: 1px 0; }
-    .badge-method.badge-google { background: #1f4f8a; color: #cfe3ff; }
-    .badge-method.badge-google.pending { background: #4a4520; color: #e3c95a; }
-    .badge-recovery { background: #4b3a6b; color: #d9c8f5; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .user-email { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
-    .user-timestamps {
-        font-size: 11px;
-        color: #888;
-        white-space: nowrap;
-        text-align: right;
-        border-left: none !important;
-    }
-    .user-timestamps div { line-height: 1.6; }
-    .btn-sm { font-size: 12px; padding: 2px 10px; }
-    /* 補助操作（キャンセル・コピー）用の中立色。Bootstrap の outline-secondary は
-       ダークテーマ上で無効ボタンに見えるため、テーマ変数ベースで枠線をはっきりさせる */
-    .btn-outline-neutral {
-        color: var(--text-primary);
-        border: 1px solid var(--text-secondary);
-        background: transparent;
-    }
-    .btn-outline-neutral:hover {
-        color: var(--text-primary);
-        background: var(--bg-card-hover);
-        border-color: var(--text-primary);
-    }
-    /* Bootstrap の success 緑はダーク背景では沈んで見えるため、ダークテーマだけ明るい緑に */
-    [data-theme="dark"] .btn-outline-success {
-        --bs-btn-color: #3fb950;
-        --bs-btn-border-color: #3fb950;
-        --bs-btn-hover-bg: #3fb950;
-        --bs-btn-hover-border-color: #3fb950;
-        --bs-btn-hover-color: #000;
-    }
-    .alert { font-size: 14px; }
-    .reset-pw-input { width: 140px; display: inline-block; }
-    .pw-field-wrapper {
-        position: relative;
-    }
-    .pw-field-wrapper .form-control {
-        padding-right: 32px;
-    }
-    .pw-toggle-eye {
-        position: absolute;
-        right: 6px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: none;
-        border: none;
-        color: var(--text-secondary);
-        cursor: pointer;
-        padding: 2px;
-        line-height: 0;
-    }
-    .pw-toggle-eye:hover { color: var(--text-primary); }
-    .role-menu {
-        display: none;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        margin-top: 4px;
-        background: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 10;
-        min-width: 150px;
-        padding: 4px 0;
-    }
-    .role-menu.open { display: block; }
-    .role-menu form { margin: 0; }
-    .role-menu-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-        padding: 8px 12px;
-        border: none;
-        background: none;
-        color: var(--text-primary);
-        font-size: 13px;
-        cursor: pointer;
-        text-align: left;
-        white-space: nowrap;
-    }
-    .role-menu-item:hover {
-        background: var(--bg-card-hover, rgba(255,255,255,0.05));
-    }
-    /* 行内の展開式パネル（PW変更 / Google連携） */
-    .inline-panel {
-        display: none;
-        align-items: center;
-        gap: 6px;
-        margin-top: 6px;
-    }
-    .inline-panel.open { display: flex; }
-    .inline-panel .form-control {
-        background: var(--bg-log-odd);
-        border-color: var(--border-color);
-        color: var(--text-primary);
-    }
-    .inline-panel .form-control:focus {
-        background: var(--bg-log-odd);
-        color: var(--text-primary);
-        border-color: #5a9fd4;
-        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
-    }
-    .google-email-input { width: 230px; display: inline-block; }
-    /* 招待リンクの表示 */
-    .invite-panel { font-size: 13px; border-radius: 6px; }
-    .invite-url-row { display: flex; gap: 6px; margin-top: 8px; }
-    .invite-url-row .form-control {
-        font-family: Consolas, 'Courier New', monospace;
-        font-size: 12px;
-        background: rgba(0,0,0,0.15);
-        color: inherit;
-        border-color: rgba(0,0,0,0.2);
-    }
-    .invite-url-row .form-control:focus {
-        background: rgba(0,0,0,0.15);
-        color: inherit;
-        box-shadow: none;
-        border-color: rgba(0,0,0,0.3);
-    }
-</style>
+{% include "_user_styles.html" %}
 {% endblock %}
 {% block content %}
 <div class="page-header">
     <a class="page-header-back" href="{{ PREFIX }}/admin">管理メニュー</a>
     <span class="page-header-sep">›</span>
-    <span class="page-header-title">ユーザー管理</span>
+    <span class="page-header-title">全ユーザー管理</span>
 </div>
 
 {% if error %}
@@ -231,31 +26,12 @@
 </div>
 {% endif %}
 
-{% if invite %}
-<div class="alert alert-success invite-panel">
-    <strong>{{ invite.username }}</strong>（{{ invite.email }}）への招待リンクを発行しました。
-    {% if invite.note %}<br>{{ invite.note }}{% endif %}
-    {% if invite.mail_sent %}
-    招待メールを送信しました。届かない場合は以下のリンクを直接伝えてください。
-    {% elif invite.mail_error %}
-    <span class="text-danger">招待メールの送信に失敗しました（{{ invite.mail_error }}）。</span>以下のリンクを直接伝えてください。
-    {% else %}
-    以下のリンクを本人に伝えてください。
-    {% endif %}
-    <div class="invite-url-row">
-        <input type="text" class="form-control form-control-sm" id="invite-url" value="{{ invite.url }}" readonly onclick="this.select()">
-        <button type="button" class="btn btn-outline-neutral btn-sm" style="white-space:nowrap;" onclick="copyInviteUrl(this)">コピー</button>
-    </div>
-    <div class="add-form-hint" style="margin-top:6px;">
-        有効期限 {{ invite.expire_hours }} 時間。本人が招待された Google アカウントでログインすると有効化されます。
-        期限が切れても、登録済みの Google アカウントならログイン画面の「Google でログイン」から入れます。
-    </div>
-</div>
-{% endif %}
+{% include "_invite_panel.html" %}
 
 <div class="add-form">
     <h6 style="color: var(--text-secondary); margin-bottom: 12px;">新規ユーザー追加</h6>
-    <form method="post" action="{{ PREFIX }}/users/create" id="add-user-form">
+    <div class="add-form-hint" style="margin:-6px 0 10px;">プロジェクトのメンバー追加・役割変更は各プロジェクトの「メンバー管理」で行います。ここでは全ユーザーのアカウント自体（有効/無効・システム管理者権限・パスワード・Google 連携）を管理します。</div>
+    <form method="post" action="{{ PREFIX }}/admin/users/create" id="add-user-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="add-form-row">
             <div class="add-form-field">
@@ -287,12 +63,19 @@
                 <label class="form-label">Email（Google アカウント）</label>
                 <input type="email" class="form-control form-control-sm" name="email" id="add-email" placeholder="user@gmail.com" autocomplete="off">
             </div>
+            <div class="add-form-field" style="width:180px;">
+                <label class="form-label">初期プロジェクト（任意）</label>
+                <select class="form-select form-select-sm" name="project_id" style="background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);">
+                    <option value="0">（なし）</option>
+                    {% for p in projects %}<option value="{{ p.id }}">{{ p.name }} ({{ p.slug }})</option>{% endfor %}
+                </select>
+            </div>
             <div class="add-form-field auto">
                 <label class="form-label">&nbsp;</label>
                 <div class="add-form-controls">
                     <div class="form-check">
                         <input type="checkbox" class="form-check-input" name="is_superuser" value="true" id="is_superuser">
-                        <label class="form-check-label" for="is_superuser">管理者権限</label>
+                        <label class="form-check-label" for="is_superuser" title="全プロジェクトの管理・プロジェクトの作成削除・全ユーザー管理ができる">システム管理者</label>
                     </div>
                     <button type="submit" class="btn btn-primary btn-sm">追加</button>
                 </div>
@@ -311,6 +94,7 @@
             <th>Email</th>
             <th>ログイン方法</th>
             <th>権限</th>
+            <th>所属プロジェクト</th>
             <th>状態</th>
             <th>操作</th>
             <th style="text-align:right; border-left:none;"></th>
@@ -330,10 +114,17 @@
                 {% if not u.has_password and not u.has_google %}<span style="color:var(--text-secondary);">—</span>{% endif %}
             </td>
             <td>
-                {% if u.is_superuser %}<span class="badge-super">管理者</span>{% else %}<span class="badge-general">一般</span>{% endif %}
+                {% if u.is_superuser %}<span class="badge-super" title="全プロジェクトを管理できる">システム管理者</span>{% else %}<span class="badge-general">一般</span>{% endif %}
                 {% if ADMIN_GOOGLE_EMAIL and u.email == ADMIN_GOOGLE_EMAIL %}
                 <span class="badge-recovery" title=".env の ADMIN_GOOGLE_EMAIL に指定されたアカウント。無効化・降格しても再起動時に管理者権限・有効状態に戻ります">復旧用</span>
                 {% endif %}
+            </td>
+            <td>
+                {% for m in u.memberships|sort(attribute='project.name') %}
+                <a class="badge-project{% if m.role == 'admin' %} admin{% endif %}" href="{{ project_url(m.project.slug, '/users') }}" title="{{ m.project.name }}: {% if m.role == 'admin' %}プロジェクト管理者{% else %}メンバー{% endif %}">{{ m.project.slug }}{% if m.role == 'admin' %} ★{% endif %}</a>
+                {% else %}
+                <span style="color:var(--text-secondary);">—</span>
+                {% endfor %}
             </td>
             <td>
                 {% if u.is_invite_pending %}
@@ -347,23 +138,23 @@
                         <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleRoleMenu(this)">権限変更</button>
                         <div class="role-menu">
                             {% if u.is_superuser %}
-                            <form method="post" action="{{ PREFIX }}/users/toggle_superuser/{{ u.id }}">
+                            <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' の管理者権限を外しますか？')">
+                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' のシステム管理者権限を外しますか？')">
                                     <span class="badge-general" style="display:inline-block;">一般</span> に変更
                                 </button>
                             </form>
                             {% else %}
-                            <form method="post" action="{{ PREFIX }}/users/toggle_superuser/{{ u.id }}">
+                            <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' に管理者権限を付与しますか？')">
-                                    <span class="badge-super" style="display:inline-block;">管理者</span> に変更
+                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' にシステム管理者権限を付与しますか？')">
+                                    <span class="badge-super" style="display:inline-block;">システム管理者</span> に変更
                                 </button>
                             </form>
                             {% endif %}
                         </div>
                     </div>
-                    <form method="post" action="{{ PREFIX }}/users/toggle/{{ u.id }}" style="display:inline;">
+                    <form method="post" action="{{ PREFIX }}/admin/users/toggle/{{ u.id }}" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit" class="btn {% if u.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %} btn-sm">
                             {% if u.is_active %}無効化{% else %}有効化{% endif %}
@@ -372,17 +163,17 @@
                     <button type="button" class="btn btn-outline-info btn-sm" style="white-space:nowrap;" onclick="togglePanel(this, '.pw-reset-panel')">{% if u.has_password %}PW変更{% else %}PW設定{% endif %}</button>
                     <button type="button" class="btn btn-outline-info btn-sm" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
                     {% if u.has_google and not u.google_sub %}
-                    <form method="post" action="{{ PREFIX }}/users/reinvite/{{ u.id }}" style="display:inline;">
+                    <form method="post" action="{{ PREFIX }}/admin/users/reinvite/{{ u.id }}" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit" class="btn btn-outline-info btn-sm" style="white-space:nowrap;">招待リンク再発行</button>
                     </form>
                     {% endif %}
-                    <form method="post" action="{{ PREFIX }}/users/delete/{{ u.id }}" style="display:inline;" data-username="{{ u.username }}" onsubmit="return confirm('ユーザー「' + this.dataset.username + '」を削除しますか？')">
+                    <form method="post" action="{{ PREFIX }}/admin/users/delete/{{ u.id }}" style="display:inline;" data-username="{{ u.username }}" onsubmit="return confirm('ユーザー「' + this.dataset.username + '」を削除しますか？')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
                     </form>
                 </div>
-                <form method="post" action="{{ PREFIX }}/users/reset_password/{{ u.id }}" class="inline-panel pw-reset-panel">
+                <form method="post" action="{{ PREFIX }}/admin/users/reset_password/{{ u.id }}" class="inline-panel pw-reset-panel">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="password" name="new_password" class="form-control form-control-sm reset-pw-input" placeholder="新しいパスワード" required minlength="4" oninput="updatePwBtn(this)">
                     <button type="submit" class="btn btn-info btn-sm" style="white-space:nowrap;" disabled>適用</button>
@@ -394,7 +185,7 @@
                     <button type="button" class="btn btn-outline-info btn-sm" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
                 </div>
                 {% endif %}
-                <form method="post" action="{{ PREFIX }}/users/set_email/{{ u.id }}" class="inline-panel google-panel" data-username="{{ u.username }}">
+                <form method="post" action="{{ PREFIX }}/admin/users/set_email/{{ u.id }}" class="inline-panel google-panel" data-username="{{ u.username }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="email" name="email" class="form-control form-control-sm google-email-input" value="{{ u.email or '' }}" placeholder="user@gmail.com" autocomplete="off"{% if not GOOGLE_ENABLED %} disabled title="Google ログインが未設定です"{% endif %}>
                     <button type="submit" class="btn btn-info btn-sm" style="white-space:nowrap;"{% if not GOOGLE_ENABLED %} disabled{% endif %}>{% if u.has_google %}変更{% else %}招待{% endif %}</button>
@@ -415,92 +206,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-function toggleRoleMenu(btn) {
-    var menu = btn.nextElementSibling;
-    var isOpen = menu.classList.contains('open');
-    document.querySelectorAll('.role-menu.open').forEach(function(m) { m.classList.remove('open'); });
-    if (!isOpen) menu.classList.add('open');
-}
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.role-dropdown')) {
-        document.querySelectorAll('.role-menu.open').forEach(function(m) { m.classList.remove('open'); });
-    }
-});
-function closeAllPanels() {
-    document.querySelectorAll('.inline-panel.open').forEach(function(p) {
-        p.classList.remove('open');
-        var pw = p.querySelector('input[name="new_password"]');
-        if (pw) {
-            pw.value = '';
-            p.querySelector('button[type="submit"]').disabled = true;
-        }
-        var email = p.querySelector('input[name="email"]');
-        if (email) email.value = email.defaultValue;
-    });
-}
-function togglePanel(btn, selector) {
-    var panel = btn.closest('td').querySelector(selector);
-    var wasOpen = panel.classList.contains('open');
-    closeAllPanels();
-    if (!wasOpen) {
-        panel.classList.add('open');
-        var input = panel.querySelector('input:not([type="hidden"])');
-        if (input && !input.disabled) input.focus();
-    }
-}
-function updatePwBtn(input) {
-    var btn = input.closest('.pw-reset-panel').querySelector('button[type="submit"]');
-    btn.disabled = input.value.length < 4;
-}
-function unlinkGoogle(btn) {
-    // ユーザー名は JS 文字列に直接埋め込まず data 属性から読む（HTML エスケープでは JS 文字列を守れないため）
-    var username = btn.form.dataset.username;
-    if (!confirm(username + ' の Google 連携を解除しますか？\nこのユーザーは Google でログインできなくなります。')) return false;
-    // 空の email を送ると連携解除になる（サーバー側で判定）
-    btn.form.querySelector('input[name="email"]').value = '';
-    return true;
-}
-function updateLoginMethod() {
-    var checked = document.querySelector('input[name="login_method"]:checked');
-    var isGoogle = checked && checked.value === 'google';
-    document.getElementById('add-field-password').hidden = isGoogle;
-    document.getElementById('add-field-email').hidden = !isGoogle;
-    document.getElementById('add-hint-password').hidden = isGoogle;
-    document.getElementById('add-hint-google').hidden = !isGoogle;
-    document.getElementById('add-email').required = isGoogle;
-}
-updateLoginMethod();
-function copyInviteUrl(btn) {
-    var input = document.getElementById('invite-url');
-    var done = function() {
-        btn.textContent = 'コピーしました';
-        setTimeout(function() { btn.textContent = 'コピー'; }, 1500);
-    };
-    var fallback = function() {
-        input.select();
-        document.execCommand('copy');
-        done();
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(input.value).then(done, fallback);
-    } else {
-        fallback();
-    }
-}
-function togglePasswordVisibility(inputId, btn) {
-    var input = document.getElementById(inputId);
-    var eyeIcon = btn.querySelector('.eye-icon');
-    var eyeOffIcon = btn.querySelector('.eye-off-icon');
-    if (input.type === 'password') {
-        input.type = 'text';
-        eyeIcon.style.display = 'none';
-        eyeOffIcon.style.display = 'inline';
-    } else {
-        input.type = 'password';
-        eyeIcon.style.display = 'inline';
-        eyeOffIcon.style.display = 'none';
-    }
-}
-</script>
+{% include "_user_scripts.html" %}
 {% endblock %}

@@ -12,6 +12,7 @@ UniModules.SendReportServer/
 ├── .env.example            # 環境変数テンプレート（.env は git 管理外）
 ├── Dockerfile
 ├── docker-compose.yml      # 開発用
+├── docker-compose.prod.yml.example  # 本番用 override の雛形（実ファイルは git 管理外）
 ├── docker-compose.light.yml# 軽量ホスト用の DB 設定（本番では prod.yml の db.command に書く）
 ├── alembic.ini / alembic/  # DB マイグレーション
 ├── app/                    # FastAPI アプリ本体
@@ -78,11 +79,15 @@ docker compose exec app alembic upgrade head
 
 ### 4. 本番環境へデプロイする
 
-AWS EC2 へのデプロイ手順は用途別に 2 種類ある。
+AWS へのデプロイ手順は構成別に 3 種類ある。常時公開する最安構成は Lightsail 版。
 
-- [docs/aws_deploy_budget.md](docs/aws_deploy_budget.md) — 低コスト構成（t3.nano 等）
-- [docs/aws_deploy_standard.md](docs/aws_deploy_standard.md) — 標準構成（t3.micro 以上）
-- [docs/aws_deployment_guide.md](docs/aws_deployment_guide.md) — 共通のデプロイガイド
+- [docs/aws_deploy_lightsail.md](docs/aws_deploy_lightsail.md) — Lightsail 最小バンドル（$5 定額・固定 IP 込み。現行の推奨）
+- [docs/aws_deploy_budget.md](docs/aws_deploy_budget.md) — EC2 低コスト構成（t4g.nano 等）
+- [docs/aws_deploy_standard.md](docs/aws_deploy_standard.md) — EC2 標準構成（t4g.micro 以上）
+- [docs/aws_deployment_guide.md](docs/aws_deployment_guide.md) — 構成の選び方と共通事項
+
+更新手順（`git pull` → `up -d --build`）と、ファイルコピーで配置した環境を git 管理に切り替える手順は
+`aws_deploy_lightsail.md` の 12 章にある。
 
 デプロイ先のドメイン・EC2 インスタンス ID・SSH 鍵のパスは**プロジェクト毎に異なる**ため、このリポジトリには持たせていない。導入先プロジェクト側（例: `.claude/commands/` の運用コマンド、CI の設定）で管理する。
 

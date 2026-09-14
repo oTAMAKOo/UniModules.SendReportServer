@@ -98,6 +98,7 @@ INFO  [alembic.runtime.migration] Running upgrade  -> 001, create report_data ta
 INFO  [alembic.runtime.migration] Running upgrade 001 -> 002, create admin_user table
 INFO  [alembic.runtime.migration] Running upgrade 002 -> 003, create system_config table
 INFO  [alembic.runtime.migration] Running upgrade 003 -> 004, add last_login_at
+INFO  [alembic.runtime.migration] Running upgrade 004 -> 005, add google auth columns to admin_user
 ```
 
 ### Step 5: 動作確認
@@ -246,7 +247,8 @@ UniModules.SendReportServer/
 │       ├── 001_create_report_data.py
 │       ├── 002_create_admin_user.py
 │       ├── 003_create_system_config.py
-│       └── 004_add_last_login_at.py
+│       ├── 004_add_last_login_at.py
+│       └── 005_add_google_auth.py   # email / google_sub 追加、password_hash の NULL 許容
 ├── nginx/
 │   └── nginx.conf          # Nginx設定（リバースプロキシ）
 ├── app/
@@ -258,6 +260,9 @@ UniModules.SendReportServer/
 │   ├── auth.py             # 認証（bcryptハッシュ、セッショントークン）
 │   ├── crypto.py           # AES-256-CBC 復号処理
 │   ├── storage.py          # 画像保存（ローカル / S3 対応）
+│   ├── ratelimit.py        # IP ごとのレート制限（ログイン / Google 認証 / レポート受信）
+│   ├── google_auth.py      # Google OAuth（認可 URL、code 交換、ID トークン検証）
+│   ├── mail.py             # 招待メール送信（none / SES / SMTP）
 │   ├── routers/
 │   │   ├── api.py          # クライアント向けAPI（レポート受信）
 │   │   └── admin.py        # 管理画面（ログイン、一覧、詳細、ユーザー管理等）
@@ -302,7 +307,9 @@ UniModules.SendReportServer/
 |--------|-----|------|
 | id | Integer PK | 自動採番 |
 | username | String(100) UNIQUE | ユーザー名 |
-| password_hash | String(255) | bcryptハッシュ |
+| password_hash | String(255) NULL可 | bcryptハッシュ。Google 専用ユーザーは NULL |
+| email | String(255) UNIQUE NULL可 | Google ログインの許可リスト（小文字で保存） |
+| google_sub | String(255) UNIQUE NULL可 | Google アカウントの一意 ID。初回 Google ログインで保存 |
 | is_superuser | Boolean | 管理者権限 |
 | is_active | Boolean | 有効/無効 |
 | created_at | DateTime | 作成日時 |

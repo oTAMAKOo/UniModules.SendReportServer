@@ -344,6 +344,31 @@ nano docker-compose.prod.yml
 - `--workers 2` → **`--workers 1`**（RAM 0.5GB のため）
 - db の `command:`（軽量構成）の**コメントを外す**（RAM 0.5GB のため。内容は `docker-compose.light.yml` と同じ）
 
+コメントを外すときは `#` と直後の半角スペース 1 つ（`# `）を消す。`#` だけ消すとインデントが
+1 つ深くなり YAML エラーで起動しなくなる。編集後の `db` セクションはこの形になる:
+
+```yaml
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: <DB_PASSWORD>
+    ports: !override []
+    restart: always
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c work_mem=2MB
+      -c maintenance_work_mem=16MB
+      -c effective_cache_size=128MB
+      -c max_connections=20
+```
+
+編集後に構文を確認する（何も表示されなければ OK。エラーが出たらインデントを見直す）:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml config > /dev/null
+```
+
 ### 7-4. 軽量構成について ★必須
 
 軽量構成（PostgreSQL の `shared_buffers=32MB` 等）は、7-3 のとおり `docker-compose.prod.yml` の
@@ -454,6 +479,8 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/<FQDN>/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
+    # 一度 https で開いたブラウザは以後 http で接続しなくなる（Cookie の平文送信を防ぐ）
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     location /storage/ {
         alias /app/storage/;
@@ -709,6 +736,7 @@ sudo certbot renew --dry-run
 ```bash
 ssh -i <KEY>.pem ec2-user@<STATIC_IP>
 cd /home/ec2-user/log-server
+/home/ec2-user/backup-db.sh                                   # 更新前に DB をバックアップ（マイグレーションを含み得るため）
 git pull origin main
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs app --tail 20
@@ -717,34 +745,45 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs app --tail 
 ログに alembic の `Running upgrade ...`（マイグレーションがある場合）と
 `Application startup complete` が出れば完了。
 
+- `up` には**必ず** `-f docker-compose.yml -f docker-compose.prod.yml` を付ける。`-f` 無しで
+  `docker compose up` すると開発用の設定（5432 公開、`./app` バインドマウント、`--reload`、
+  DB パスワード `logserver`）で上がってしまう
 - `.env` の設定項目が増えた更新（例: Google ログインの `PUBLIC_BASE_URL` / `GOOGLE_*`）は、
   `.env.example` の差分を見て `.env` に追記してから `up -d --build` する
 - app コンテナの再作成中（30 秒前後）はレポート受信が止まる。クライアントは再送しないので、
-  その間に送られたレポートは失われる
+  その間に送られたレポートは失われる。`docker-compose.prod.yml` の db 設定を変えた場合は db も
+  再作成され、その数秒間は app からの接続が失敗する（データはボリュームに残る）
 - `docker-compose.prod.yml` / `.env` / `docker-compose.override.yml` は `.gitignore` 対象なので
   `git pull` の影響を受けない。`nginx/nginx.conf`（9-3 で HTTPS 化）はローカル変更として残るため、
   上流でこのファイルが変わったときは `git stash` → `git pull` → `git stash pop` で取り込む
+  （`git stash` にはコミッター名の設定が要る。下の切り替え手順で設定している）
 
 #### 配置先が git 管理されていない場合
 
 7-1 の `git clone` を使わずファイルをコピーして置いた場合（`/home/ec2-user/log-server` に `.git` が無く、
 `git pull` が `not a git repository` になる）は、一度だけ以下で git 管理に切り替える。
-稼働中のコンテナには影響しない。
+稼働中のコンテナには影響しない（本番はイメージに焼いたコードで動いているため）。
 
 ```bash
 cd /home/ec2-user/log-server
-cp nginx/nginx.conf /home/ec2-user/nginx.conf.https      # HTTPS 設定を退避
 git init -b main
+git config user.name ec2-user && git config user.email ec2-user@localhost   # git stash 用
 git remote add origin https://github.com/oTAMAKOo/UniModules.SendReportServer.git
 git fetch origin
-git reset origin/main            # HEAD とインデックスを origin/main に合わせる（作業ツリーは触らない）
-git checkout -- .                # 追跡ファイルを origin/main の内容に揃える（CRLF で置かれていても直る）
-cp /home/ec2-user/nginx.conf.https nginx/nginx.conf      # HTTPS 設定を戻す
-git branch --set-upstream-to=origin/main main
-git status --short               # M が nginx/nginx.conf だけなら OK（?? の未追跡ファイルは無視してよい）
+git reset origin/main                         # HEAD とインデックスを origin/main に合わせる（作業ツリーは触らない）
+git diff -w --stat -- . ':!nginx/nginx.conf'  # ★ ここで何か表示されたら、サーバー上で直接編集した追跡ファイルがある。中断して内容を確認する
+git checkout -- . ':!nginx/nginx.conf'        # nginx.conf 以外の追跡ファイルを origin/main の内容に揃える（CRLF で置かれていても直る）
+git branch --set-upstream-to=origin/main main # 任意（git status の ahead/behind 表示用）
+rm -f docker-compose.override.yml             # 旧手順で置いた軽量構成のコピー。-f 明示では読まれず混乱の元なので消す（7-4）
+git status --short                            # M nginx/nginx.conf だけなら OK（?? の未追跡ファイルは無視してよい）
 ```
 
-以後は上の「アプリの更新」の手順で更新できる。
+`git diff -w --stat` は空白（CRLF の `\r` を含む）だけの差分を無視するので、Windows からコピーして
+改行コードが CRLF になっているだけなら何も表示されない。何か表示された場合は `git diff -w -- <ファイル>`
+で中身を確認し、必要なら退避してから `git checkout` する。
+
+以後は上の「アプリの更新」の手順で更新できる。切り替え後の初回更新はコピー時点からの
+全変更（マイグレーションを含み得る）を一度に適用するので、先に `backup-db.sh` を実行すること。
 
 ### ログの確認
 
@@ -764,11 +803,25 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db \
 
 ### DBリストア
 
+バックアップは `pg_dump` のプレーン形式（`--clean` 無し）なので、**稼働中の DB にそのまま流し込むと
+`CREATE TABLE` は「already exists」、`COPY` は主キー重複で全件失敗し、実質何も戻らない**
+（psql は既定でエラーを無視して進むため、成功したように見える）。app を止めて DB を作り直してから流す。
+既存データはすべてバックアップ時点の内容に置き換わるので、直前に手動バックアップを取っておく。
+
 ```bash
+cd /home/ec2-user/log-server
+C="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 aws s3 cp s3://<バケット名>/backups/backup_YYYYMMDD.sql ./backup.sql
-cat backup.sql | docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  exec -T db psql -U logserver logserver
+/home/ec2-user/backup-db.sh                       # 直前の状態も残す
+$C stop app                                       # DB への接続を止める（この間レポート受信は失敗する）
+$C exec -T db psql -U logserver -d postgres -c "DROP DATABASE logserver WITH (FORCE);" -c "CREATE DATABASE logserver OWNER logserver;"
+$C exec -T db psql -U logserver -d logserver -v ON_ERROR_STOP=1 < backup.sql
+$C start app
+$C logs app --tail 5                              # startup complete を確認
+rm backup.sql
 ```
+
+`ON_ERROR_STOP=1` を付けているので、途中でエラーが出れば止まる（無言で壊れない）。
 
 ### リソースの確認
 

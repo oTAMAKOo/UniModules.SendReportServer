@@ -26,6 +26,8 @@ services:
     ports: !override []
     restart: always
     # RAM 0.5GB の安価構成（Lightsail nano / t4g.nano）では以下のコメントを外す（軽量構成）。
+    # 外すときは "# "（# と半角スペース 1 つ）を消す。# だけ消すとインデントがずれて YAML エラーになる。
+    # 編集後は docker compose -f docker-compose.yml -f docker-compose.prod.yml config で構文を確認する。
     # 内容は docker-compose.light.yml と同じ。-f を明示して起動するため
     # docker-compose.override.yml は自動で読み込まれず、ここに直接書く必要がある。
     # 適用確認: ... exec -T db psql -U logserver -d logserver -c "SHOW shared_buffers" → 32MB
@@ -52,7 +54,7 @@ services:
   nginx:
     restart: always
     # HTTPS を使う場合は以下のコメントを外す（証明書を certbot で取得済みであること）。
-    # 手順は docs/aws_deploy_standard.md の 9-5、または aws_deploy_budget.md の 9-5。
+    # 手順は docs/aws_deploy_lightsail.md の 9-4、または aws_deploy_standard.md / aws_deploy_budget.md の 9-5。
     # ports: !override
     #   - "80:80"
     #   - "443:443"

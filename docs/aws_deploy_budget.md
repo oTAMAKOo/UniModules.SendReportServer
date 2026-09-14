@@ -426,18 +426,24 @@ cd log-server
 
 ローカルPCの別のターミナルで、リポジトリの**親ディレクトリ**から実行:
 ```bash
-scp -i logserver-key.pem -r ./UniModules.SendReportServer ec2-user@<SERVER_IP>:/home/ec2-user/log-server
+rsync -av -e "ssh -i logserver-key.pem" --exclude .git ./UniModules.SendReportServer/ ec2-user@<SERVER_IP>:/home/ec2-user/log-server/
 ```
 
 > 転送先 `/home/ec2-user/log-server` が既に存在する場合は、中身だけを転送する（ディレクトリ指定だと `log-server/UniModules.SendReportServer` と二重にネストするため）:
 ```bash
-scp -i logserver-key.pem -r ./UniModules.SendReportServer/* ec2-user@<SERVER_IP>:/home/ec2-user/log-server/
+rsync -av -e "ssh -i logserver-key.pem" --exclude .git ./UniModules.SendReportServer/ ec2-user@<SERVER_IP>:/home/ec2-user/log-server/
 ```
 
 サーバー側で:
 ```bash
 cd /home/ec2-user/log-server
 ```
+
+> **方法 B で置いた配置先は git 管理されていないため、以後 `git pull` で更新できない。**
+> 更新の前に [aws_deploy_lightsail.md](aws_deploy_lightsail.md) 12 章「配置先が git 管理されていない場合」の
+> 手順で git 管理に切り替えること。`scp -r dir/*` はドットファイル（`.env.example` / `.gitignore`）を
+> 転送しないため rsync（末尾の `/` でディレクトリの中身を同期）を使う。
+
 
 ### 7-2. 本番用 .env ファイルの作成
 
@@ -632,6 +638,8 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/log.yourdomain.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
+    # 一度 https で開いたブラウザは以後 http で接続しなくなる（Cookie の平文送信を防ぐ）
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     location /storage/ {
         alias /app/storage/;
@@ -779,10 +787,24 @@ docker compose exec -T db pg_dump -U logserver logserver > backup.sql
 
 ### DBリストア
 
+バックアップは `pg_dump` のプレーン形式（`--clean` 無し）なので、**稼働中の DB にそのまま流し込むと
+`CREATE TABLE` は「already exists」、`COPY` は主キー重複で全件失敗し、実質何も戻りません**
+（psql は既定でエラーを無視して進むため、成功したように見えます）。app を止めて DB を作り直してから流します。
+既存データはすべてバックアップ時点の内容に置き換わるので、直前に手動バックアップを取ってください。
+
 ```bash
-aws s3 cp s3://your-project-logserver/backups/backup_20260409.sql ./backup.sql
-cat backup.sql | docker compose exec -T db psql -U logserver logserver
+cd /home/ec2-user/log-server
+C="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+aws s3 cp s3://<バケット名>/backups/backup_YYYYMMDD.sql ./backup.sql
+$C exec -T db pg_dump -U logserver logserver > before_restore.sql   # 直前の状態も残す
+$C stop app                                                          # DB への接続を止める（この間レポート受信は失敗する）
+$C exec -T db psql -U logserver -d postgres -c "DROP DATABASE logserver WITH (FORCE);" -c "CREATE DATABASE logserver OWNER logserver;"
+$C exec -T db psql -U logserver -d logserver -v ON_ERROR_STOP=1 < backup.sql
+$C start app
+$C logs app --tail 5                                                 # startup complete を確認
 ```
+
+`ON_ERROR_STOP=1` を付けているので、途中でエラーが出れば止まります（無言で壊れません）。
 
 ### ディスク・メモリの確認
 
@@ -882,13 +904,15 @@ docker compose exec db pg_isready -U logserver
 1. AWSコンソール → EC2 → インスタンスを停止
 2. インスタンスタイプを `t4g.micro` に変更
 3. インスタンスを起動
-4. SSH接続して軽量構成を解除（`docker-compose.prod.yml` の db の `command:` をコメントアウト）:
+4. SSH接続して `docker-compose.prod.yml` を 2 箇所編集する:
+   - db の `command:` ブロック（軽量構成）をコメントアウト
+   - app の `--workers 1` を `--workers 2` に変更
+   > 軽量構成の `max_connections=20` を残したまま `--workers 2` にしないこと（接続数が足りなくなる）。
+5. 反映（db と app が再作成される）:
    ```bash
    cd /home/ec2-user/log-server
-   nano docker-compose.prod.yml   # db の command: ブロックをコメントアウトする
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml config > /dev/null &&    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
    ```
-5. `docker-compose.prod.yml` の `--workers 1` を `--workers 2` に変更
 
 > スケールアップはインスタンス停止→タイプ変更→起動だけなので数分で完了します。
 > データやIPアドレスは変わりません。

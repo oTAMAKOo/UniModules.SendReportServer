@@ -34,6 +34,8 @@ RESERVED_SLUGS = {
 
 REPORT_NOT_FOUND_MESSAGE = "レポート #{id} は存在しないか、アクセス権がありません"
 
+_DETAIL_PATH_RE = re.compile(r"/detail/(\d+)/?$")
+
 
 class RedirectException(Exception):
     """依存関数から「プレフィックス付きの path へ 302」を要求する。"""
@@ -199,6 +201,13 @@ def require_project(min_role: str = ROLE_MEMBER):
     ) -> ProjectContext:
         project = get_project_by_slug(db, project_slug)
         if project is None:
+            # slug が変更された後に共有済みの /p/<旧slug>/detail/<id> を開いたときの救済。
+            # レポート ID は全体で通し番号なので、所属を確認できれば新しい slug へ転送できる
+            match = _DETAIL_PATH_RE.search(request.url.path)
+            if match:
+                report = resolve_report_for_user(db, user, int(match.group(1)))
+                if report is not None:
+                    raise RedirectException(f"/p/{report.project.slug}/detail/{report.id}")
             raise RedirectException("/projects?error=notfound")
         role = effective_role(db, user, project)
         if role is None:

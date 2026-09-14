@@ -16,8 +16,8 @@
 
 {% if emergency %}
 <div class="alert alert-warning" style="font-size:13px; border-radius:6px;">
-    <strong>緊急管理者アカウントを自動作成しました</strong><br>
-    アクティブな管理者が0人になったため、以下の認証情報で緊急アカウントを作成しました。<br>
+    <strong>緊急システム管理者アカウントを自動作成しました</strong><br>
+    有効なシステム管理者が 0 人になったため、以下の認証情報で緊急アカウントを作成しました。<br>
     この情報はこの画面を離れると二度と表示されません。必ずメモしてください。<br>
     <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.15); border-radius:4px; font-family:Consolas,'Courier New',monospace; font-size:14px;">
         ユーザー名: <strong>{{ emergency.username }}</strong><br>
@@ -52,7 +52,7 @@
             <div class="add-form-field" id="add-field-password">
                 <label class="form-label">パスワード</label>
                 <div class="pw-field-wrapper">
-                    <input type="password" class="form-control form-control-sm" name="password" id="add-password" minlength="4" placeholder="password">
+                    <input type="password" class="form-control form-control-sm" name="password" id="add-password" minlength="8" placeholder="8 文字以上">
                     <button type="button" class="pw-toggle-eye" onclick="togglePasswordVisibility('add-password', this)" tabindex="-1" title="パスワードを表示">
                         <svg class="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         <svg class="eye-off-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -81,7 +81,7 @@
                 </div>
             </div>
         </div>
-        <div class="add-form-hint" id="add-hint-password">※ パスワード空欄の場合「password」が設定されます</div>
+        <div class="add-form-hint" id="add-hint-password">※ パスワードは 8 文字以上（必須）。本人に伝えたら初回ログイン後に変更してもらってください</div>
         <div class="add-form-hint" id="add-hint-google" hidden>※ 招待リンクが発行されます。本人がリンクから上記の Google アカウントでログインすると有効になります</div>
     </form>
 </div>
@@ -114,9 +114,9 @@
                 {% if not u.has_password and not u.has_google %}<span style="color:var(--text-secondary);">—</span>{% endif %}
             </td>
             <td>
-                {% if u.is_superuser %}<span class="badge-super" title="全プロジェクトを管理できる">システム管理者</span>{% else %}<span class="badge-general">一般</span>{% endif %}
+                {% if u.is_superuser %}<span class="badge-sysadmin" title="全プロジェクトを管理できる">システム管理者</span>{% else %}<span class="badge-member">一般</span>{% endif %}
                 {% if ADMIN_GOOGLE_EMAIL and u.email == ADMIN_GOOGLE_EMAIL %}
-                <span class="badge-recovery" title=".env の ADMIN_GOOGLE_EMAIL に指定されたアカウント。無効化・降格しても再起動時に管理者権限・有効状態に戻ります">復旧用</span>
+                <span class="badge-recovery" title=".env の ADMIN_GOOGLE_EMAIL に指定されたアカウント。無効化・降格しても再起動時にシステム管理者権限・有効状態に戻ります">復旧用</span>
                 {% endif %}
             </td>
             <td>
@@ -141,14 +141,14 @@
                             <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' のシステム管理者権限を外しますか？')">
-                                    <span class="badge-general" style="display:inline-block;">一般</span> に変更
+                                    <span class="badge-member" style="display:inline-block;">一般</span> に変更
                                 </button>
                             </form>
                             {% else %}
                             <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' にシステム管理者権限を付与しますか？')">
-                                    <span class="badge-super" style="display:inline-block;">システム管理者</span> に変更
+                                    <span class="badge-sysadmin" style="display:inline-block;">システム管理者</span> に変更
                                 </button>
                             </form>
                             {% endif %}

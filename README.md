@@ -50,7 +50,8 @@ cp .env.example .env
 
 | キー | 内容 |
 |---|---|
-| `INITIAL_PROJECT_SLUG` / `INITIAL_PROJECT_NAME` | 初回起動（マイグレーション 007）で作られる最初のプロジェクトの slug と表示名（任意、既定 `default` / `Default`）。slug は受信 URL と管理画面 URL に使う |
+| `INITIAL_PROJECT_SLUG` / `INITIAL_PROJECT_NAME` | 初回起動（マイグレーション 007）で作られる最初のプロジェクトの slug と表示名（既定 `default` / `Default`）。slug は受信 URL と管理画面 URL に使う。形式不正・予約語なら起動失敗 |
+| `REPORT_AES_KEY` / `REPORT_AES_IV` | 最初のプロジェクトの AES Key（32文字）/ IV（16文字）。初回起動でだけ読まれ、以後はプロジェクト設定画面で管理する。無いと起動失敗 |
 | `URL_PREFIX` | 管理画面・API の URL プレフィックス（既定 `/buglog`）。先頭の `/` は省略可、末尾の `/` は無視される。空にするとルート直下（`/login` 等）にマウントされる |
 | `SECRET_KEY` | セッション署名用。プロジェクト毎にランダム文字列を設定する |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 起動時に作られる初期管理者。初回ログイン後に変更する |
@@ -61,7 +62,8 @@ cp .env.example .env
 | `ADMIN_GOOGLE_EMAIL` | ロックアウト復旧用（任意）。起動のたびに管理者権限を保証する Google アカウント |
 | `MCP_ENABLED` | Claude Code 向け MCP サーバー（`/buglog/mcp`）を公開するか（既定 `true`） |
 
-AES Key/IV は**プロジェクトごと**に管理画面で設定する（システム管理者は `/buglog/admin/projects`、プロジェクト管理者は `/buglog/p/<slug>/settings`）。
+AES Key/IV は**プロジェクトごと**に持ち、各プロジェクトの設定画面（`/buglog/p/<slug>/settings`。プロジェクト管理者とシステム管理者が開ける）で変更する。
+初回起動時は `.env` の `REPORT_AES_KEY` / `REPORT_AES_IV` が最初のプロジェクトの鍵になる（どちらも無いと起動時に失敗する）。
 Unity クライアント側の `PLCryptoAES.KEY`（32文字）/ `PLCryptoAES.IV`（16文字）と一致させる。ズレていると受信が 400 になる。
 セッション有効期限は全体共通で、システム設定（`/buglog/system`）から変更できる。
 
@@ -110,6 +112,13 @@ AWS へのデプロイ手順は構成別に 3 種類ある。常時公開する�
 - ログイン後は所属プロジェクトが 1 つならその一覧へ、複数ならプロジェクト選択画面（`/buglog/projects`）へ進む。ナビバーで切り替えられる
 - プロジェクトの追加はシステム管理者が `/buglog/admin/projects` で行う（AES Key/IV はランダム生成されるので、Unity 側の鍵をそれに合わせるか、後からプロジェクト設定で書き換える）
 - 旧 URL（`/buglog/detail/<id>` など）は所属を確認したうえで新しい URL へ転送される
+
+**単一プロジェクト構成（マイグレーション 006 以前）からの更新**は受信 URL が変わる破壊的変更になる。
+更新した瞬間から配布済みクライアントの `POST /buglog/report` は 404 になり、レポートは届かない（クライアントは再送しない）。
+手順: (1) `.env` に `INITIAL_PROJECT_SLUG` / `INITIAL_PROJECT_NAME` を追加（`REPORT_AES_KEY` / `REPORT_AES_IV` は既存の値のまま）
+→ (2) `git pull` → `up -d --build`（007 が既存レポートとユーザーを最初のプロジェクトへ紐付ける）
+→ (3) クライアントの送信先を `POST /buglog/report/<slug>` に変えたビルドを配る。
+旧 URL を一時的に残したい場合は nginx で `location = /buglog/report { rewrite ^ /buglog/report/<slug> last; }` を置く。
 
 ## Claude Code からレポートを読む
 

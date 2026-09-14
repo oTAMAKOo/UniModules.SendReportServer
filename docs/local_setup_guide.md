@@ -103,6 +103,9 @@ INFO  [alembic.runtime.migration] Running upgrade 001 -> 002, create admin_user 
 INFO  [alembic.runtime.migration] Running upgrade 002 -> 003, create system_config table
 INFO  [alembic.runtime.migration] Running upgrade 003 -> 004, add last_login_at
 INFO  [alembic.runtime.migration] Running upgrade 004 -> 005, add google auth columns to admin_user
+INFO  [alembic.runtime.migration] Running upgrade 005 -> 006, create api_token table
+INFO  [alembic.runtime.migration] Running upgrade 006 -> 007, create project / project_member and attach reports to a project
+INFO  [alembic.runtime.migration] 最初のプロジェクトを作成しました: slug=default name=Default
 ```
 
 ### Step 5: 動作確認
@@ -257,7 +260,9 @@ UniModules.SendReportServer/
 │       ├── 002_create_admin_user.py
 │       ├── 003_create_system_config.py
 │       ├── 004_add_last_login_at.py
-│       └── 005_add_google_auth.py   # email / google_sub 追加、password_hash の NULL 許容
+│       ├── 005_add_google_auth.py   # email / google_sub 追加、password_hash の NULL 許容
+│       ├── 006_create_api_token.py  # 読み取り API / MCP 用の個人トークン
+│       └── 007_create_project.py    # プロジェクト・所属の追加、レポートの紐付け、画像キーの書き換え
 ├── nginx/
 │   └── nginx.conf          # Nginx設定（リバースプロキシ）
 ├── app/
@@ -281,21 +286,33 @@ UniModules.SendReportServer/
 │   │   ├── system_admin.py # システム管理者専用（プロジェクト管理、全ユーザー管理、システム設定）
 │   │   ├── reports_api.py  # 読み取り専用 API（Claude Code 等）
 │   │   └── common.py       # ルーター共通ヘルパー
+│   ├── report_export.py    # レポートの Markdown / JSON 整形、検索クエリ（画面・API・MCP 共通）
+│   ├── mcp_server.py       # Claude Code 向け MCP サーバー（読み取り専用ツール）
 │   ├── templates/          # Jinja2 HTMLテンプレート
-│   │   ├── base.html       # ベーステンプレート（ダーク/ライトテーマ）
+│   │   ├── base.html       # ベーステンプレート（ダーク/ライトテーマ、プロジェクト切替）
 │   │   ├── login.html
+│   │   ├── projects.html   # プロジェクト選択
 │   │   ├── report_list.html
 │   │   ├── report_detail.html
 │   │   ├── report_manage.html
+│   │   ├── project_members.html   # メンバー管理（プロジェクト管理者）
+│   │   ├── project_settings.html  # AES Key/IV・受信 URL（プロジェクト管理者）
 │   │   ├── admin_menu.html
+│   │   ├── admin_projects.html    # プロジェクト管理（システム管理者）
+│   │   ├── user_list.html         # 全ユーザー管理（システム管理者）
+│   │   ├── system_config.html     # セッション有効期限
+│   │   ├── api_tokens.html
 │   │   ├── password_change.html
-│   │   ├── user_list.html
-│   │   └── system_config.html
+│   │   ├── error.html
+│   │   └── _user_styles.html / _user_scripts.html / _invite_panel.html  # ユーザー系画面の共通部品
 │   └── static/
 │       └── icons/          # 検索アイコン等
 ├── docs/
-│   ├── aws_deployment_guide.md  # AWS本番デプロイ手順
-│   └── local_setup_guide.md     # このファイル
+│   ├── local_setup_guide.md     # このファイル
+│   ├── google_auth_setup.md     # Google ログインの設定
+│   ├── claude_integration.md    # Claude Code 連携（API トークン・MCP）
+│   ├── aws_deployment_guide.md  # AWS デプロイ（構成の選択）
+│   └── aws_deploy_{lightsail,budget,standard}.md  # 各構成の手順
 └── seed_dummy.py           # ダミーデータ投入スクリプト
 ```
 
@@ -306,15 +323,16 @@ UniModules.SendReportServer/
 ### ReportData（レポート）
 | カラム | 型 | 説明 |
 |--------|-----|------|
-| id | Integer PK | 自動採番 |
+| id | Integer PK | 自動採番（全プロジェクトで通し番号） |
+| project_id | Integer FK NOT NULL | 所属プロジェクト（`project.id`、RESTRICT。レポートが残るプロジェクトは削除不可） |
 | title | String(255) | レポートタイトル |
-| created_at | DateTime | 作成日時 |
+| created_at | DateTime | 作成日時（UTC） |
 | user_id | String(255) | ユーザーID |
 | user_name | String(255) | ユーザー名 |
 | device_model | String(255) | デバイスモデル名 |
 | log | Text | ログテキスト（JSON形式） |
-| img_name | Text | スクリーンショット画像ファイル名 |
-| img_thumbnail_name | Text | サムネイル画像ファイル名 |
+| img_name | Text | スクリーンショットのストレージキー（`report/<slug>/images/<file>.png`。007 以前の行は `report/images/...`） |
+| img_thumbnail_name | Text | サムネイルのストレージキー（`report/<slug>/thumbnail/thumbnail_<file>.png`） |
 | extend_info | Text | 拡張情報（JSON） |
 
 ### AdminUser（管理ユーザー）
@@ -325,7 +343,7 @@ UniModules.SendReportServer/
 | password_hash | String(255) NULL可 | bcryptハッシュ。Google 専用ユーザーは NULL |
 | email | String(255) UNIQUE NULL可 | Google ログインの許可リスト（小文字で保存） |
 | google_sub | String(255) UNIQUE NULL可 | Google アカウントの一意 ID。初回 Google ログインで保存 |
-| is_superuser | Boolean | 管理者権限 |
+| is_superuser | Boolean | システム管理者（全プロジェクトの管理、プロジェクトの作成・削除、全ユーザー管理） |
 | is_active | Boolean | 有効/無効 |
 | created_at | DateTime | 作成日時 |
 | last_login_at | DateTime | 最終ログイン日時 |

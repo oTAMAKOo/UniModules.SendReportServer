@@ -790,6 +790,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs app --tail 
   DB パスワード `logserver`）で上がってしまう
 - `.env` の設定項目が増えた更新（例: Google ログインの `PUBLIC_BASE_URL` / `GOOGLE_*`）は、
   `.env.example` の差分を見て `.env` に追記してから `up -d --build` する
+- **マルチプロジェクト対応（マイグレーション 007）への更新は受信 URL が変わる。** 更新前に `.env` へ
+  `INITIAL_PROJECT_SLUG` / `INITIAL_PROJECT_NAME` を追加し（`REPORT_AES_KEY` / `REPORT_AES_IV` は既存のまま残す）、
+  `up -d --build` 後は配布済みクライアントの `POST /buglog/report` が 404 になるため、送信先を
+  `POST /buglog/report/<slug>` に変えたビルドを同時に配る。旧 URL を一時的に残すなら
+  `nginx/nginx.conf` に `location = /buglog/report { rewrite ^ /buglog/report/<slug> last; }` を足して nginx を再作成する
 - app コンテナの再作成中（30 秒前後）はレポート受信が止まる。クライアントは再送しないので、
   その間に送られたレポートは失われる。`docker-compose.prod.yml` の db 設定を変えた場合は db も
   再作成され、その数秒間は app からの接続が失敗する（データはボリュームに残る）

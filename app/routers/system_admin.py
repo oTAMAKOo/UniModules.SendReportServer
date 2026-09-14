@@ -212,7 +212,8 @@ async def user_create(
         return _users_page(request, user, db, error="指定されたプロジェクトが存在しません")
 
     new_user, error = create_user(
-        db, username=username, login_method=login_method, password=password, email=email, is_superuser=is_superuser
+        db, username=username, login_method=login_method, password=password, email=email,
+        is_superuser=is_superuser, allow_reserved=True,
     )
     if error:
         return _users_page(request, user, db, error=error)

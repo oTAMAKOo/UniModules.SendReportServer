@@ -201,6 +201,7 @@
         .nav-project-item.active { color: var(--text-primary); font-weight: 600; }
         .nav-role-badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: #3d4450; color: #c9d1d9; }
         .nav-role-badge.admin { background: #d4a017; color: #000; }
+        .nav-role-badge.sys { background: #4b3a6b; color: #d9c8f5; }
         /* ログアウト赤 */
         .nav-dropdown-item.logout-item:hover { color: #f85149; }
         .nav-dropdown-item.logout-item:hover svg { opacity: 1; stroke: #f85149; }
@@ -243,7 +244,7 @@
                     {% for p, r in nav_projects %}
                     <a class="nav-dropdown-item nav-project-item{% if p.id == current_project.id %} active{% endif %}" href="{{ project_url(p.slug, '/list') }}">
                         <span>{{ p.name }}</span>
-                        <span class="nav-role-badge{% if r == 'admin' %} admin{% endif %}">{% if r == 'admin' %}管理者{% else %}メンバー{% endif %}</span>
+                        {% if current_user and current_user.is_superuser %}<span class="nav-role-badge sys">システム管理者</span>{% elif r == 'admin' %}<span class="nav-role-badge admin">プロジェクト管理者</span>{% else %}<span class="nav-role-badge">メンバー</span>{% endif %}
                     </a>
                     {% endfor %}
                     <div class="nav-dropdown-divider"></div>

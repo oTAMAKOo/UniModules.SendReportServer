@@ -75,7 +75,7 @@ def check_and_create_emergency_admin(db: Session) -> dict | None:
         return None
     alphabet = string.ascii_letters + string.digits
     password = "".join(secrets.choice(alphabet) for _ in range(12))
-    username = "emergency_admin"
+    username = EMERGENCY_ADMIN_USERNAME
     existing = db.query(AdminUser).filter(AdminUser.username == username).first()
     if existing:
         existing.password_hash = hash_password(password)
@@ -135,6 +135,19 @@ async def issue_invite(target: AdminUser, note: str | None = None) -> dict:
     return result
 
 
+EMERGENCY_ADMIN_USERNAME = "emergency_admin"
+MIN_PASSWORD_LENGTH = 8
+
+
+def reserved_usernames() -> set[str]:
+    """起動時・緊急時の処理が名前で特定するアカウント。プロジェクト管理者には作らせない。
+
+    ensure_admin_google_email は ADMIN_USERNAME のアカウントを superuser に昇格させるため、
+    先取りで作られると権限昇格の経路になる。
+    """
+    return {settings.admin_username, EMERGENCY_ADMIN_USERNAME}
+
+
 def create_user(
     db: Session,
     *,
@@ -143,17 +156,24 @@ def create_user(
     password: str = "",
     email: str = "",
     is_superuser: bool = False,
+    allow_reserved: bool = False,
 ) -> tuple[AdminUser | None, str | None]:
     """ユーザーを作成して (user, None) を返す。入力に問題があれば (None, エラー文)。
 
-    login_method が "password" ならパスワードユーザー（空なら "password"）。
+    login_method が "password" ならパスワードユーザー（8 文字以上、必須）。
     "google" なら email だけを持つ招待中ユーザー（is_active=False）を作る。招待リンクの発行は
     呼び出し側（issue_invite）で行う。commit はここで行う。
     全ユーザー管理（システム管理者）とプロジェクトのメンバー管理（プロジェクト管理者）で共用する。
+    ユーザー名に '@' は使えない（メンバー追加でメールアドレスと区別するため）。予約名
+    （ADMIN_USERNAME / emergency_admin）はシステム管理者（allow_reserved=True）だけが作れる。
     """
     username = username.strip()
     if len(username) < 1 or len(username) > 64:
         return None, "ユーザー名は1〜64文字で入力してください"
+    if "@" in username:
+        return None, "ユーザー名に '@' は使えません（メールアドレスと区別するため）"
+    if not allow_reserved and username in reserved_usernames():
+        return None, f"ユーザー名 '{username}' はシステムで予約されているため使えません"
 
     if db.query(AdminUser).filter(AdminUser.username == username).first():
         return None, f"ユーザー名 '{username}' は既に存在します"
@@ -174,11 +194,9 @@ def create_user(
     if login_method != "password":
         return None, "ログイン方法が不正です"
 
-    # パスワード未入力時はデフォルト値を設定
-    if not password:
-        password = "password"
-    if len(password) < 4:
-        return None, "パスワードは4文字以上で入力してください"
+    # 推測されやすい既定パスワードは設定しない。空なら作成させない
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return None, f"パスワードは{MIN_PASSWORD_LENGTH}文字以上で入力してください"
 
     new_user = AdminUser(username=username, password_hash=hash_password(password), is_superuser=is_superuser)
     db.add(new_user)

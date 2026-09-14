@@ -75,6 +75,10 @@
     .login-method-option input { margin: 0; cursor: pointer; }
     .login-method-option.disabled { color: var(--text-secondary); cursor: not-allowed; }
     .login-method-option.disabled input { cursor: not-allowed; }
+    /* 役割バッジ。色は全画面で固定: システム管理者 = 紫、プロジェクト管理者 = 金、メンバー = 灰 */
+    .badge-sysadmin { background: #4b3a6b; color: #d9c8f5; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+    .badge-projadmin { background: #d4a017; color: #000; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+    .badge-member { background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
     .badge-super { background: #d4a017; color: #000; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
     .badge-general { background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
     .badge-active { background: #238636; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
@@ -87,7 +91,7 @@
     .badge-project:hover { background: #27507c; color: #cfe3ff; }
     .badge-project.admin { background: #5a4a17; color: #e3c95a; }
     .badge-project.admin:hover { background: #75611f; color: #f3dc7a; }
-    .badge-recovery { background: #4b3a6b; color: #d9c8f5; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+    .badge-recovery { background: #1f5a56; color: #a8e6df; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
     .user-email { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
     .user-timestamps {
         font-size: 11px;

@@ -8,8 +8,9 @@ Create Date: 2026-09-15
 
 - project / project_member を作成
 - 既存データから最初のプロジェクトを 1 つ作る。AES Key/IV は system_config の aes_key / aes_iv
-  （無ければ環境変数 REPORT_AES_KEY / REPORT_AES_IV、それも無ければランダム生成）。
-  slug / 表示名は環境変数 INITIAL_PROJECT_SLUG / INITIAL_PROJECT_NAME（既定 default / Default）
+  （無ければ環境変数 REPORT_AES_KEY / REPORT_AES_IV。どちらにも無ければ移行を失敗させる）。
+  slug / 表示名は環境変数 INITIAL_PROJECT_SLUG / INITIAL_PROJECT_NAME（既定 default / Default。
+  形式不正・予約語なら失敗）
 - 全レポートをそのプロジェクトに所属させ、全ユーザーをメンバーにする（superuser は admin）。
   招待中（is_active=False）のユーザーも含める。除外すると招待受諾後に見えるプロジェクトが無くなる
 - img_name / img_thumbnail_name をファイル名からストレージキー全体（report/images/xxx.png）へ
@@ -17,16 +18,17 @@ Create Date: 2026-09-15
 - system_config の aes_key / aes_iv を削除（以後はプロジェクトの設定が正）
 
 downgrade は不可逆な部分がある: 007 以降に保存された画像（report/<slug>/images/...）は
-旧スキーマ（ファイル名のみ）で表せないため、旧コードからは参照できなくなる。
+旧スキーマ（ファイル名のみ）で表せないため、旧コードからは参照できなくなる。また system_config に
+戻すのは id 最小のプロジェクトの鍵だけで、2 つ目以降のプロジェクトの鍵と所属情報は失われる。
 """
 import logging
 import os
-import re
-import secrets
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+
+from app.authz import validate_slug
 
 revision: str = "007"
 down_revision: Union[str, None] = "006"
@@ -35,28 +37,41 @@ depends_on: Union[str, Sequence[str], None] = None
 
 logger = logging.getLogger("alembic.runtime.migration")
 
-_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,39}$")
+
+class InitialProjectConfigError(RuntimeError):
+    """最初のプロジェクトを作るための設定が不足・不正。移行を失敗させて明示的な設定を求める。"""
 
 
 def _initial_project_values(conn) -> dict:
-    """最初のプロジェクトに使う slug / name / AES Key / IV を決める。"""
+    """最初のプロジェクトに使う slug / name / AES Key / IV を決める。
+
+    不足や形式不正は黙って補わず例外にする。ランダム鍵で作ると受信が 400 のまま原因が
+    マイグレーションログにしか残らず、slug を勝手に default にすると配布済みクライアントの
+    送信先とずれる。マイグレーションは 1 トランザクションなので失敗しても DB は変わらない。
+    """
     slug = (os.environ.get("INITIAL_PROJECT_SLUG") or "default").strip().lower()
-    if not _SLUG_RE.match(slug):
-        logger.warning("INITIAL_PROJECT_SLUG '%s' は使えない形式のため 'default' にします", slug)
-        slug = "default"
+    slug_error = validate_slug(slug)
+    if slug_error:
+        raise InitialProjectConfigError(f"INITIAL_PROJECT_SLUG '{slug}' は使えません: {slug_error}")
     name = (os.environ.get("INITIAL_PROJECT_NAME") or "").strip() or ("Default" if slug == "default" else slug)
 
     rows = dict(conn.execute(sa.text("SELECT key, value FROM system_config WHERE key IN ('aes_key', 'aes_iv')")).fetchall())
     aes_key = (rows.get("aes_key") or "").strip() or (os.environ.get("REPORT_AES_KEY") or "").strip()
     aes_iv = (rows.get("aes_iv") or "").strip() or (os.environ.get("REPORT_AES_IV") or "").strip()
     if not aes_key or not aes_iv:
-        logger.warning(
-            "AES Key/IV が system_config にも環境変数にも無いためランダム生成しました。"
-            "管理画面の /admin/projects でクライアントと同じ値に設定してください"
+        raise InitialProjectConfigError(
+            "最初のプロジェクトの AES Key/IV が決まりません。.env に REPORT_AES_KEY（32 文字）と "
+            "REPORT_AES_IV（16 文字）を設定してから起動してください（起動後はプロジェクト設定画面 "
+            "/p/<slug>/settings で管理します）"
         )
-        aes_key = aes_key or secrets.token_hex(16)
-        aes_iv = aes_iv or secrets.token_hex(8)
-    return {"slug": slug, "name": name[:100], "aes_key": aes_key[:32], "aes_iv": aes_iv[:16]}
+    key_len, iv_len = len(aes_key.encode("utf-8")), len(aes_iv.encode("utf-8"))
+    if key_len not in (16, 24, 32) or iv_len != 16:
+        raise InitialProjectConfigError(
+            f"AES Key は 16 / 24 / 32 バイト、IV は 16 バイトである必要があります（現在 Key={key_len}, IV={iv_len}）"
+        )
+    if key_len != 32:
+        logger.warning("AES Key が %d バイトです。プロジェクト設定画面は 32 文字（AES-256）を要求するため、画面から保存し直すには 32 文字の鍵が必要です", key_len)
+    return {"slug": slug, "name": name[:100], "aes_key": aes_key, "aes_iv": aes_iv}
 
 
 def upgrade() -> None:

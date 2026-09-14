@@ -205,17 +205,15 @@ async def report_bulk_delete(
     if not date_from and not date_to:
         return _manage_page(request, ctx, db, error="日付を指定してください")
 
+    # 日付の形式不正は無視せずエラーにする（無視すると条件無しの全件削除になってしまう）
     query = db.query(ReportData).filter(ReportData.project_id == ctx.project.id)
-    if date_from:
-        try:
-            query = query.filter(ReportData.created_at >= datetime.strptime(date_from, "%Y-%m-%d"))
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            query = query.filter(ReportData.created_at < datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1))
-        except ValueError:
-            pass
+    try:
+        if date_from:
+            query = query.filter(ReportData.created_at >= datetime.strptime(date_from.strip(), "%Y-%m-%d"))
+        if date_to:
+            query = query.filter(ReportData.created_at < datetime.strptime(date_to.strip(), "%Y-%m-%d") + timedelta(days=1))
+    except ValueError:
+        return _manage_page(request, ctx, db, error="日付は YYYY-MM-DD の形式で指定してください")
 
     # 画像ファイルも削除
     reports = query.all()
@@ -260,7 +258,13 @@ async def member_add(
     ctx: ProjectContext = AdminCtx,
     db: Session = Depends(get_db),
 ):
-    """既存ユーザーをユーザー名またはメールアドレスでプロジェクトに追加する。"""
+    """既存ユーザーをユーザー名またはメールアドレスでプロジェクトに追加する。
+
+    '@' を含む識別子はメールアドレスとしてだけ探す（ユーザー名には '@' を使えないので、
+    メールアドレスそっくりのユーザー名で別人を紛れ込ませることはできない）。
+    プロジェクト管理者が全ユーザーを探る手段にならないよう、「見つからない」と「既にメンバー」は
+    同じ文言で返し、成功時も入力された識別子だけを表示する（相手のユーザー名は一覧で分かる範囲に留める）。
+    """
     if not verify_csrf(csrf_token, ctx.user):
         return redirect("/login")
     if role not in (ROLE_ADMIN, ROLE_MEMBER):
@@ -269,19 +273,22 @@ async def member_add(
     identifier = identifier.strip()
     if not identifier:
         return _members_page(request, ctx, db, error="ユーザー名またはメールアドレスを入力してください")
-    target = db.query(AdminUser).filter(AdminUser.username == identifier).first()
-    if target is None:
+    if "@" in identifier:
         email = normalize_email(identifier)
-        if email:
-            target = db.query(AdminUser).filter(AdminUser.email == email).first()
-    if target is None:
-        return _members_page(request, ctx, db, error=f"ユーザー '{identifier}' が見つかりません。新規の人は下のフォームから作成してください")
-    if get_membership(db, target.id, ctx.project.id):
-        return _members_page(request, ctx, db, error=f"'{target.username}' は既にメンバーです")
+        target = db.query(AdminUser).filter(AdminUser.email == email).first() if email else None
+    else:
+        target = db.query(AdminUser).filter(AdminUser.username == identifier).first()
+
+    not_added = (
+        f"'{identifier}' は追加できませんでした（該当するユーザーが存在しないか、既にメンバーです）。"
+        "アカウントが無い人は下のフォームから作成してください"
+    )
+    if target is None or get_membership(db, target.id, ctx.project.id):
+        return _members_page(request, ctx, db, error=not_added)
 
     db.add(ProjectMember(project_id=ctx.project.id, user_id=target.id, role=role))
     db.commit()
-    return _members_page(request, ctx, db, message=f"'{target.username}' を追加しました")
+    return _members_page(request, ctx, db, message=f"'{identifier}' を追加しました")
 
 
 @router.post("/users/create", response_class=HTMLResponse)

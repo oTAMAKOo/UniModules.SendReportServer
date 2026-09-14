@@ -138,7 +138,7 @@ def list_projects(ctx: Context) -> str:
             return "参加しているプロジェクトがありません。プロジェクト管理者に追加を依頼してください。"
         lines = ["## 参加プロジェクト", ""]
         for project, role in projects:
-            role_name = "管理者" if role == "admin" else "メンバー"
+            role_name = "システム管理者" if user.is_superuser else ("プロジェクト管理者" if role == "admin" else "メンバー")
             state = "" if project.is_active else " / 受信停止中"
             lines.append(f"- `{project.slug}` — {project.name}（{role_name}{state}）")
         if len(projects) == 1:

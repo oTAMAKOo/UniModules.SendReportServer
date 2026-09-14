@@ -71,7 +71,7 @@
             <div class="add-form-field" id="add-field-password">
                 <label class="form-label">パスワード</label>
                 <div class="pw-field-wrapper">
-                    <input type="password" class="form-control form-control-sm" name="password" id="add-password" minlength="4" placeholder="password">
+                    <input type="password" class="form-control form-control-sm" name="password" id="add-password" minlength="8" placeholder="8 文字以上">
                     <button type="button" class="pw-toggle-eye" onclick="togglePasswordVisibility('add-password', this)" tabindex="-1" title="パスワードを表示">
                         <svg class="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         <svg class="eye-off-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -89,7 +89,7 @@
                 </div>
             </div>
         </div>
-        <div class="add-form-hint" id="add-hint-password">※ パスワード空欄の場合「password」が設定されます。作成したユーザーはこのプロジェクトのメンバーになります</div>
+        <div class="add-form-hint" id="add-hint-password">※ パスワードは 8 文字以上（必須）。作成したユーザーはこのプロジェクトのメンバーになります</div>
         <div class="add-form-hint" id="add-hint-google" hidden>※ 招待リンクが発行されます。本人がリンクから上記の Google アカウントでログインすると有効になります</div>
     </form>
 </div>
@@ -110,7 +110,7 @@
         {% for m in members %}
         {% set u = m.user %}
         <tr>
-            <td>{{ u.username }}{% if u.is_superuser %} <span class="badge-recovery" title="システム管理者（全プロジェクトを管理できる）">SYS</span>{% endif %}</td>
+            <td>{{ u.username }}{% if u.is_superuser %} <span class="badge-sysadmin" title="システム管理者（所属に関係なく全プロジェクトを管理できる）">システム管理者</span>{% endif %}</td>
             <td class="user-email">{{ u.email or '—' }}</td>
             <td>
                 {% if u.has_password %}<span class="badge-method">パスワード</span>{% endif %}
@@ -120,7 +120,7 @@
                 {% if not u.has_password and not u.has_google %}<span style="color:var(--text-secondary);">—</span>{% endif %}
             </td>
             <td>
-                {% if m.membership.role == 'admin' %}<span class="badge-super">プロジェクト管理者</span>{% else %}<span class="badge-general">メンバー</span>{% endif %}
+                {% if m.membership.role == 'admin' %}<span class="badge-projadmin">プロジェクト管理者</span>{% else %}<span class="badge-member">メンバー</span>{% endif %}
             </td>
             <td>
                 {% if u.is_invite_pending %}
@@ -138,12 +138,12 @@
                                 {% if m.membership.role == 'admin' %}
                                 <input type="hidden" name="role" value="member">
                                 <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' をメンバーに変更しますか？')">
-                                    <span class="badge-general" style="display:inline-block;">メンバー</span> に変更
+                                    <span class="badge-member" style="display:inline-block;">メンバー</span> に変更
                                 </button>
                                 {% else %}
                                 <input type="hidden" name="role" value="admin">
                                 <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' をプロジェクト管理者にしますか？')">
-                                    <span class="badge-super" style="display:inline-block;">管理者</span> に変更
+                                    <span class="badge-projadmin" style="display:inline-block;">プロジェクト管理者</span> に変更
                                 </button>
                                 {% endif %}
                             </form>

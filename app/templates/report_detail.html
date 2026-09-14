@@ -256,7 +256,7 @@
                             {% else %}
                             <img src="/static/icons/d_console_infoicon.png" alt="info">
                             {% endif %}
-                            <span class="log-msg">{{ entry.message | safe }}</span>
+                            <span class="log-msg">{{ entry.message }}</span>
                         </div>
                         {% endfor %}
                         {% else %}
@@ -272,7 +272,7 @@
                 <td style="padding:0;">
                     <div id="StackTrace">
                         {% for entry in log_entries %}
-                        <p style="display:none;" class="log_info" id="{{ loop.index0 }}">{{ entry.message | safe }}
+                        <p style="display:none;" class="log_info" id="{{ loop.index0 }}">{{ entry.message }}
 {{ entry.stacktrace }}</p>
                         {% endfor %}
                     </div>

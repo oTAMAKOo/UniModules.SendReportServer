@@ -6,8 +6,8 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # 実ファイル docker-compose.prod.yml は DB パスワードを含むため .gitignore 対象。
-# 詳細な手順は docs/aws_deploy_standard.md（通常構成）または
-# docs/aws_deploy_budget.md（安価構成）の 7-3 を参照。
+# 詳細な手順は docs/aws_deploy_lightsail.md / docs/aws_deploy_budget.md（安価構成）
+# または docs/aws_deploy_standard.md（通常構成）の 7-3 を参照。
 #
 # !override について:
 #   compose の ports / volumes は override 側に書いても既定では「マージ」される。
@@ -25,6 +25,17 @@ services:
     # 開発用 compose が公開している 5432 を塞ぐ。
     ports: !override []
     restart: always
+    # RAM 0.5GB の安価構成（Lightsail nano / t4g.nano）では以下のコメントを外す（軽量構成）。
+    # 内容は docker-compose.light.yml と同じ。-f を明示して起動するため
+    # docker-compose.override.yml は自動で読み込まれず、ここに直接書く必要がある。
+    # 適用確認: ... exec -T db psql -U logserver -d logserver -c "SHOW shared_buffers" → 32MB
+    # command: >
+    #   postgres
+    #   -c shared_buffers=32MB
+    #   -c work_mem=2MB
+    #   -c maintenance_work_mem=16MB
+    #   -c effective_cache_size=128MB
+    #   -c max_connections=20
 
   app:
     # 開発用の ./app バインドマウントを外し、イメージに焼いたコードを使う

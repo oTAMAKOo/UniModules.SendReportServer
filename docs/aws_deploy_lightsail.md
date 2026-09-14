@@ -338,18 +338,21 @@ cp docker-compose.prod.yml.example docker-compose.prod.yml
 nano docker-compose.prod.yml
 ```
 
-書き換えるのは 2 箇所:
+書き換えるのは 3 箇所:
 
 - `POSTGRES_PASSWORD: CHANGE_ME` → `.env` の `<DB_PASSWORD>` と同じ値
 - `--workers 2` → **`--workers 1`**（RAM 0.5GB のため）
+- db の `command:`（軽量構成）の**コメントを外す**（RAM 0.5GB のため。内容は `docker-compose.light.yml` と同じ）
 
-### 7-4. 軽量構成の適用 ★必須
+### 7-4. 軽量構成について ★必須
 
-```bash
-cp docker-compose.light.yml docker-compose.override.yml
-```
+軽量構成（PostgreSQL の `shared_buffers=32MB` 等）は、7-3 のとおり `docker-compose.prod.yml` の
+`db.command` で有効にする。
 
-PostgreSQL のメモリ使用量を抑える（`shared_buffers=32MB` 等）。
+> **`cp docker-compose.light.yml docker-compose.override.yml` では効かない。**
+> `-f` でファイルを明示して起動する（7-5 と 10-1 の systemd）と、`docker-compose.override.yml` は
+> 自動では読み込まれない。override.yml が自動で読まれるのは `-f` 無しの `docker compose up`
+> （ローカル開発）だけ。適用の確認は 7-5 で行う。
 
 ### 7-5. ビルドと起動
 
@@ -362,6 +365,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```bash
 docker compose ps
 docker compose logs -f app
+```
+
+軽量構成が効いているか確認する（`32MB` なら OK。`128MB` なら `docker-compose.prod.yml` の `command:` が抜けている）:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db psql -U logserver -d logserver -c "SHOW shared_buffers"
 ```
 
 ---
@@ -702,7 +711,40 @@ ssh -i <KEY>.pem ec2-user@<STATIC_IP>
 cd /home/ec2-user/log-server
 git pull origin main
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs app --tail 20
 ```
+
+ログに alembic の `Running upgrade ...`（マイグレーションがある場合）と
+`Application startup complete` が出れば完了。
+
+- `.env` の設定項目が増えた更新（例: Google ログインの `PUBLIC_BASE_URL` / `GOOGLE_*`）は、
+  `.env.example` の差分を見て `.env` に追記してから `up -d --build` する
+- app コンテナの再作成中（30 秒前後）はレポート受信が止まる。クライアントは再送しないので、
+  その間に送られたレポートは失われる
+- `docker-compose.prod.yml` / `.env` / `docker-compose.override.yml` は `.gitignore` 対象なので
+  `git pull` の影響を受けない。`nginx/nginx.conf`（9-3 で HTTPS 化）はローカル変更として残るため、
+  上流でこのファイルが変わったときは `git stash` → `git pull` → `git stash pop` で取り込む
+
+#### 配置先が git 管理されていない場合
+
+7-1 の `git clone` を使わずファイルをコピーして置いた場合（`/home/ec2-user/log-server` に `.git` が無く、
+`git pull` が `not a git repository` になる）は、一度だけ以下で git 管理に切り替える。
+稼働中のコンテナには影響しない。
+
+```bash
+cd /home/ec2-user/log-server
+cp nginx/nginx.conf /home/ec2-user/nginx.conf.https      # HTTPS 設定を退避
+git init -b main
+git remote add origin https://github.com/oTAMAKOo/UniModules.SendReportServer.git
+git fetch origin
+git reset origin/main            # HEAD とインデックスを origin/main に合わせる（作業ツリーは触らない）
+git checkout -- .                # 追跡ファイルを origin/main の内容に揃える（CRLF で置かれていても直る）
+cp /home/ec2-user/nginx.conf.https nginx/nginx.conf      # HTTPS 設定を戻す
+git branch --set-upstream-to=origin/main main
+git status --short               # M が nginx/nginx.conf だけなら OK（?? の未追跡ファイルは無視してよい）
+```
+
+以後は上の「アプリの更新」の手順で更新できる。
 
 ### ログの確認
 
@@ -832,3 +874,14 @@ docker compose logs app | grep AES
 
 コンソールのインスタンス画面「ブラウザを使用して接続」から入り、
 ファイアウォールの 22 番ルールを直す。
+
+### 軽量構成が効いていない（`SHOW shared_buffers` が `128MB`）
+
+`docker-compose.prod.yml` の `db.command` がコメントアウトのまま。7-3 を見直して
+`up -d`（db が再作成され、数秒 DB が止まる）。`docker-compose.override.yml` に置いても
+`-f` 明示の起動では読み込まれない（7-4）。
+
+### `git pull` が「not a git repository」になる
+
+配置先を git clone せずファイルコピーで置いている。12 章「配置先が git 管理されていない場合」の
+手順で git 管理に切り替える。

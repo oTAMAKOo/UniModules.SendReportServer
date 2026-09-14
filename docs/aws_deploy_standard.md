@@ -409,7 +409,7 @@ vi docker-compose.prod.yml
 - `POSTGRES_PASSWORD: CHANGE_ME` → `.env` の `DB_PASSWORD` と同じ値
 
 > **通常版は雛形のままの `--workers 2`** で構いません（RAM 1GBなら余裕あり）。
-> **`docker-compose.override.yml` の作成は不要です。** PostgreSQLはデフォルト設定で動作します。
+> **軽量構成（db の `command:`）は不要です。** 雛形のコメントアウトのままにしてください。PostgreSQLはデフォルト設定で動作します。
 >
 > 雛形の `ports: !override []` と `volumes: !override` は、開発用 compose の 5432 公開と
 > `./app` バインドマウントを打ち消すためのものです。`!override` を外すと compose が

@@ -14,9 +14,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    # メモリチューニングは docker-compose.override.yml で設定
-    # 軽量構成: cp docker-compose.light.yml docker-compose.override.yml
-    # 標準構成: override なし（PostgreSQLデフォルト）
+    # メモリチューニング（軽量構成）の内容は docker-compose.light.yml を参照。
+    # 本番は docker-compose.prod.yml の db.command に書く（-f を明示して起動すると
+    # docker-compose.override.yml は自動で読み込まれないため）。
+    # ローカルで試すなら: docker compose -f docker-compose.yml -f docker-compose.light.yml up -d
+    # RAM 1GB 以上なら不要（PostgreSQL 既定値で動作）。
 
   app:
     build: .

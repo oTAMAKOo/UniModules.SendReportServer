@@ -12,7 +12,7 @@ UniModules.SendReportServer/
 ├── .env.example            # 環境変数テンプレート（.env は git 管理外）
 ├── Dockerfile
 ├── docker-compose.yml      # 開発用
-├── docker-compose.light.yml# 軽量ホスト用の override 素材（t3.nano 等）
+├── docker-compose.light.yml# 軽量ホスト用の DB 設定（本番では prod.yml の db.command に書く）
 ├── alembic.ini / alembic/  # DB マイグレーション
 ├── app/                    # FastAPI アプリ本体
 ├── nginx/nginx.conf

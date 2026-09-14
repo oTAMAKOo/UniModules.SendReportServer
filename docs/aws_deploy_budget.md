@@ -496,22 +496,28 @@ cp docker-compose.prod.yml.example docker-compose.prod.yml
 vi docker-compose.prod.yml
 ```
 
-書き換えるのは 2 箇所です。
+書き換えるのは 3 箇所です。
 
 - `POSTGRES_PASSWORD: CHANGE_ME` → `.env` の `DB_PASSWORD` と同じ値
 - `--workers 2` → **`--workers 1`**（RAM 0.5GBなのでワーカーは1つに制限します）
+- db の `command:`（軽量構成）の**コメントを外す**（RAM 0.5GB のため。内容は `docker-compose.light.yml` と同じ）
 
 > 雛形の `ports: !override []` と `volumes: !override` は、開発用 compose の 5432 公開と
 > `./app` バインドマウントを打ち消すためのものです。`!override` を外すと compose が
 > マージしてしまい、どちらも残ります（`!override` は Docker Compose v2.24.0 以降）。
 
-### 7-4. 軽量構成の適用 ★安価版で必須
+### 7-4. 軽量構成について ★安価版で必須
 
-```bash
-cp docker-compose.light.yml docker-compose.override.yml
-```
+軽量構成（PostgreSQL の `shared_buffers=32MB` 等）は、7-3 のとおり `docker-compose.prod.yml` の
+`db.command` で有効にします。
 
-> これでPostgreSQLのメモリ使用量が抑えられます（shared_buffers=32MB 等）。
+> **`cp docker-compose.light.yml docker-compose.override.yml` では効きません。**
+> `-f` でファイルを明示して起動する（7-5 と 10-1 の systemd）と、`docker-compose.override.yml` は
+> 自動では読み込まれません。起動後に `SHOW shared_buffers` が `32MB` になっていることを確認してください:
+>
+> ```bash
+> docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db psql -U logserver -d logserver -c "SHOW shared_buffers"
+> ```
 
 ### 7-5. ビルドと起動
 
@@ -876,10 +882,10 @@ docker compose exec db pg_isready -U logserver
 1. AWSコンソール → EC2 → インスタンスを停止
 2. インスタンスタイプを `t4g.micro` に変更
 3. インスタンスを起動
-4. SSH接続して軽量構成を解除:
+4. SSH接続して軽量構成を解除（`docker-compose.prod.yml` の db の `command:` をコメントアウト）:
    ```bash
    cd /home/ec2-user/log-server
-   rm docker-compose.override.yml
+   nano docker-compose.prod.yml   # db の command: ブロックをコメントアウトする
    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
    ```
 5. `docker-compose.prod.yml` の `--workers 1` を `--workers 2` に変更
@@ -903,7 +909,7 @@ docker compose exec db pg_isready -U logserver
 - [ ] ソースコード配置
 - [ ] .env 作成（パスワード全てランダム生成）
 - [ ] docker-compose.prod.yml 作成
-- [ ] **docker-compose.override.yml 作成（軽量構成）**
+- [ ] **docker-compose.prod.yml の db.command で軽量構成を有効化**
 - [ ] docker compose up -d --build
 - [ ] ブラウザでログイン確認
 - [ ] Unityクライアントからの送信テスト

@@ -1,8 +1,20 @@
-# 軽量構成（t3.nano + swap 向け）
-# 使い方: cp docker-compose.light.yml docker-compose.override.yml
+# 軽量構成（RAM 0.5GB: Lightsail nano / t4g.nano + swap 向け）の PostgreSQL 設定。
 #
-# PostgreSQLのメモリ使用量を抑え、RAM 0.5GB環境で動作可能にします。
-# t3.micro以上の場合はこのファイルは不要です（PostgreSQLデフォルトで動作）。
+# 使い方:
+#   本番（-f docker-compose.yml -f docker-compose.prod.yml で起動する構成）では、
+#   下の db.command を docker-compose.prod.yml の db に書く。
+#   docker-compose.prod.yml.example にコメントアウトで同梱してあるので、コメントを外すだけでよい。
+#
+#   ★ `cp docker-compose.light.yml docker-compose.override.yml` は本番では効かない。
+#     -f でファイルを明示して起動すると docker-compose.override.yml は自動で読み込まれない。
+#     override.yml が自動で読まれるのは -f 無しの `docker compose up`（ローカル開発）だけ。
+#
+#   ローカル開発で試すなら -f に足す:
+#     docker compose -f docker-compose.yml -f docker-compose.light.yml up -d
+#
+# 適用の確認: psql で SHOW shared_buffers → 32MB なら有効、128MB なら既定のまま。
+# RAM 1GB 以上（t4g.micro 等）では不要（PostgreSQL 既定値で動作する）。
+# uvicorn のワーカー数は docker-compose.prod.yml の --workers で指定する。
 
 services:
   db:
@@ -13,7 +25,3 @@ services:
       -c maintenance_work_mem=16MB
       -c effective_cache_size=128MB
       -c max_connections=20
-
-  app:
-    environment:
-      - UVICORN_WORKERS=1

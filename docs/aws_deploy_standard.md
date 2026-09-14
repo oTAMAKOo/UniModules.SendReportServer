@@ -343,6 +343,10 @@ git clone git@github.com:oTAMAKOo/UniModules.SendReportServer.git log-server
 cd log-server
 ```
 
+> リポジトリは private なので、`git clone` の前にサーバーで Deploy Key（読み取り専用の SSH 鍵）を作り、
+> GitHub の Settings → Deploy keys に登録しておく。手順は [aws_deploy_lightsail.md](aws_deploy_lightsail.md) の 7-1。
+> https の URL は認証を求められて失敗する。
+
 **方法B: ローカルPCからSCPで転送**
 ```bash
 # ローカルPCで（リポジトリの親ディレクトリから実行）

@@ -285,9 +285,32 @@ docker ps               # sudo なしで動く（グループ反映の確認）
 
 ### 7-1. ソースコードの取得
 
+リポジトリは **private** なので、サーバーからは **Deploy Key**（このリポジトリだけ読める SSH 鍵）で取得する。
+https の URL は認証を求められて失敗する（`could not read Username for 'https://github.com'`）。
+
 ```bash
+# サーバー上で鍵を作る（パスフレーズ無し）
+ssh-keygen -t ed25519 -N "" -C "lightsail log-server deploy key" -f ~/.ssh/github_deploy_ed25519
+cat ~/.ssh/github_deploy_ed25519.pub
+```
+
+表示された公開鍵（`ssh-ed25519 AAAA... lightsail log-server deploy key` の 1 行）を GitHub に登録する:
+リポジトリ → **Settings → Deploy keys → Add deploy key**。Title は `lightsail log-server`、
+**Allow write access はチェックしない**（読み取り専用）。
+
+```bash
+# この鍵を github.com に使う設定と、GitHub のホスト鍵（公表値。ssh-keyscan の結果は使わない）
+cat >> ~/.ssh/config <<'EOF'
+Host github.com
+  IdentityFile ~/.ssh/github_deploy_ed25519
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config
+echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+
+# 取得
 cd /home/ec2-user
-git clone https://github.com/oTAMAKOo/UniModules.SendReportServer.git log-server
+git clone git@github.com:oTAMAKOo/UniModules.SendReportServer.git log-server
 cd log-server
 ```
 
@@ -768,7 +791,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs app --tail 
 cd /home/ec2-user/log-server
 git init -b main
 git config user.name ec2-user && git config user.email ec2-user@localhost   # git stash 用
-git remote add origin https://github.com/oTAMAKOo/UniModules.SendReportServer.git
+git remote add origin git@github.com:oTAMAKOo/UniModules.SendReportServer.git   # private なので SSH + Deploy Key（7-1 の鍵設定を先に済ませる）。https は認証で失敗する
 git fetch origin
 git reset origin/main                         # HEAD とインデックスを origin/main に合わせる（作業ツリーは触らない）
 git diff -w --stat -- . ':!nginx/nginx.conf'  # ★ ここで何か表示されたら、サーバー上で直接編集した追跡ファイルがある。中断して内容を確認する
@@ -938,3 +961,15 @@ docker compose logs app | grep AES
 
 配置先を git clone せずファイルコピーで置いている。12 章「配置先が git 管理されていない場合」の
 手順で git 管理に切り替える。
+
+### `git clone` / `git fetch` が「could not read Username for 'https://github.com'」で止まる
+
+リポジトリが private で、https の URL には認証情報が無い。7-1 のとおり Deploy Key を登録し、
+リモートを SSH の URL にする:
+
+```bash
+git remote set-url origin git@github.com:oTAMAKOo/UniModules.SendReportServer.git
+```
+
+`Permission denied (publickey)` が出る場合は、公開鍵が GitHub に登録されていないか、
+`~/.ssh/config` の `IdentityFile` が鍵のパスと合っていない。

@@ -802,20 +802,27 @@ git init -b main
 git config user.name ec2-user && git config user.email ec2-user@localhost   # git stash 用
 git remote add origin https://github.com/oTAMAKOo/UniModules.SendReportServer.git   # private で運用している場合は 7-1 の Deploy Key を設定し git@github.com: の URL にする
 git fetch origin
-git reset origin/main                         # HEAD とインデックスを origin/main に合わせる（作業ツリーは触らない）
-git diff -w --stat -- . ':!nginx/nginx.conf'  # ★ ここで何か表示されたら、サーバー上で直接編集した追跡ファイルがある。中断して内容を確認する
-git checkout -- . ':!nginx/nginx.conf'        # nginx.conf 以外の追跡ファイルを origin/main の内容に揃える（CRLF で置かれていても直る）
+# コピー元のコミットを探す（nginx.conf 以外の追跡ファイルが作業ツリーと一致するもの。空白・改行コードの差は無視）
+BASE=$(for c in $(git rev-list origin/main -n 100); do git diff -w --quiet "$c" -- . ':!nginx/nginx.conf' && echo "$c" && break; done)
+echo "${BASE:-一致するコミットなし}"          # ★ 空なら、サーバー上で直接編集した追跡ファイルがある。中断して下記で確認する
+git reset "$BASE"                             # HEAD とインデックスをコピー元に合わせる（作業ツリーは触らない）
+git checkout -- . ':!nginx/nginx.conf'        # 追跡ファイルを揃える（内容は同じ。CRLF で置かれていても LF に直る）
 git branch --set-upstream-to=origin/main main # 任意（git status の ahead/behind 表示用）
 rm -f docker-compose.override.yml             # 旧手順で置いた軽量構成のコピー。-f 明示では読まれず混乱の元なので消す（7-4）
 git status --short                            # M nginx/nginx.conf だけなら OK（?? の未追跡ファイルは無視してよい）
 ```
 
-`git diff -w --stat` は空白（CRLF の `\r` を含む）だけの差分を無視するので、Windows からコピーして
-改行コードが CRLF になっているだけなら何も表示されない。何か表示された場合は `git diff -w -- <ファイル>`
-で中身を確認し、必要なら退避してから `git checkout` する。
+origin/main と直接比較してはいけない。コピーした後に上流で進んだ変更まで「差分」に見えてしまう
+（実際に上流の変更ファイルが全部並んで判断できなくなる）。コピー元のコミットに合わせておけば、
+差分は本当にサーバー上で編集したものだけになる。
 
-以後は上の「アプリの更新」の手順で更新できる。切り替え後の初回更新はコピー時点からの
-全変更（マイグレーションを含み得る）を一度に適用するので、先に `backup-db.sh` を実行すること。
+`BASE` が空だった場合は `git diff -w --stat origin/main -- . ':!nginx/nginx.conf'` で候補を眺め、
+`git diff -w origin/main -- <ファイル>` で中身を確認する。上流の変更なら無視してよい。
+サーバー独自の編集なら退避してから進める。
+
+以後は上の「アプリの更新」の手順で更新できる。切り替え直後は HEAD がコピー元のコミットなので、
+初回の `git pull` はコピー時点からの全変更（マイグレーションを含み得る）を一度に適用する。
+先に `backup-db.sh` を実行すること。
 
 ### ログの確認
 

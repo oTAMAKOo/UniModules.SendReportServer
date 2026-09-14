@@ -123,27 +123,23 @@ aws sts get-caller-identity
 aws s3 mb s3://your-project-logserver --region ap-northeast-1
 ```
 
-### 3-2. 画像を外部から閲覧可能にする
+### 3-2. バケットを非公開に保つ
+
+スクリーンショットは、アプリが発行する期限付きの署名付き URL（`.env` の `S3_PRESIGN_EXPIRE_SECONDS`、既定 1800 秒 = 30 分）で配信します。バケットに公開読み取りのポリシーは付けず、パブリックアクセスブロックは新規バケットの既定値（4 項目とも有効）のままにします。
 
 ```bash
+# 既定値のまま。明示する場合は 4 項目とも true
 aws s3api put-public-access-block \
   --bucket your-project-logserver \
   --public-access-block-configuration \
-  "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+  "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
-aws s3api put-bucket-policy --bucket your-project-logserver --policy '{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadForReportImages",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::your-project-logserver/report/*"
-    }
-  ]
-}'
+# バケットポリシーが付いていないことを確認（NoSuchBucketPolicy と返れば正常）
+aws s3api get-bucket-policy --bucket your-project-logserver
 ```
+
+> 既存のバケットを流用する場合や、署名付き URL の注意点（期限、時刻同期）は
+> [aws_deploy_budget.md](aws_deploy_budget.md) の 3-2 を参照してください。
 
 ### 3-3. S3アクセス用のIAMユーザーを作成
 
@@ -386,6 +382,8 @@ AWS_ACCESS_KEY_ID=<S3用アクセスキーID>
 AWS_SECRET_ACCESS_KEY=<S3用シークレットアクセスキー>
 AWS_S3_BUCKET_NAME=<バケット名>
 AWS_REGION=ap-northeast-1
+# スクリーンショット URL（署名付き）の有効期限（秒）。任意。既定 1800 = 30 分、60〜604800
+# S3_PRESIGN_EXPIRE_SECONDS=1800
 
 # Admin credentials
 ADMIN_USERNAME=admin

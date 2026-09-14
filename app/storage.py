@@ -4,11 +4,15 @@ from io import BytesIO
 from base64 import b64decode
 
 import boto3
+from botocore.config import Config
 from PIL import Image
 
 from app.config import settings
 
 THUMBNAIL_WIDTH = 400
+
+# boto3 の S3 クライアントはモジュール内で 1 つだけ作って使い回す（_s3_client を参照）。
+_s3 = None
 
 
 def _scale_to_width(img: Image.Image, width: int) -> Image.Image:
@@ -50,11 +54,17 @@ def save_screenshot(base64_data: str) -> tuple[str, str]:
 
 
 def get_image_url(path: str) -> str:
-    """画像の公開URLを返す。"""
+    """画像 URL を返す。S3 は期限付きの署名付き URL、local は /storage/ 配下の相対パス。
+
+    S3 のバケットは非公開にし、この URL でのみ画像を配信する。有効期限は
+    settings.s3_presign_expire_seconds（既定 30 分）。署名は S3 と通信せず
+    ローカルで計算するので、存在しないキーを渡しても URL は返る。
+    """
     if settings.storage_mode == "s3":
-        return (
-            f"https://s3.{settings.aws_region}.amazonaws.com"
-            f"/{settings.aws_s3_bucket_name}/{path}"
+        return _s3_client().generate_presigned_url(
+            "get_object",
+            Params={"Bucket": settings.aws_s3_bucket_name, "Key": path},
+            ExpiresIn=settings.s3_presign_expire_seconds,
         )
     return f"/storage/{path}"
 
@@ -84,12 +94,29 @@ def delete_screenshot(img_name: str, thumbnail_name: str) -> None:
 
 
 def _s3_client():
-    return boto3.client(
-        "s3",
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
-        region_name=settings.aws_region,
-    )
+    """S3 クライアントを返す。生成が重いので初回だけ作り、以後は同じものを使い回す。
+
+    一覧ページは 1 ページで 25 件分の署名付き URL を作るため、毎回生成すると遅い。
+    署名は SigV4 を明示する（署名付き URL に必須）。addressing_style を virtual に
+    しないと署名付き URL のホストがリージョン無しの {bucket}.s3.amazonaws.com になる
+    ので、{bucket}.s3.{region}.amazonaws.com に揃える。boto3 のクライアントは
+    スレッド間で共有しても安全。
+    """
+    global _s3
+
+    if _s3 is None:
+        _s3 = boto3.client(
+            "s3",
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            region_name=settings.aws_region,
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "virtual"},
+            ),
+        )
+
+    return _s3
 
 
 def _save_to_s3(key: str, data: BytesIO) -> None:

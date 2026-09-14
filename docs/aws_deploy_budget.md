@@ -144,33 +144,37 @@ aws s3 mb s3://your-project-logserver --region ap-northeast-1
 
 > 例: `myapp-crash-reports`, `unity-logserver-2026` など
 
-### 3-2. 画像を外部から閲覧可能にする
+### 3-2. バケットを非公開に保つ
 
-管理画面からスクリーンショットを表示するために、`report/` フォルダだけ読み取りを許可します。
+スクリーンショットは、アプリが発行する期限付きの署名付き URL（`.env` の `S3_PRESIGN_EXPIRE_SECONDS`、既定 1800 秒 = 30 分）で配信します。管理画面の `<img>` も、MCP / 読み取り API が返す Markdown の画像 URL も、この署名付き URL です。バケットに公開読み取りのポリシーは付けず、パブリックアクセスブロックは新規バケットの既定値（4 項目とも有効）のままにします。
 
 ```bash
-# パブリックアクセスブロックの一部解除
+# 既定値のまま。明示する場合は 4 項目とも true
 aws s3api put-public-access-block \
   --bucket your-project-logserver \
   --public-access-block-configuration \
-  "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+  "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
-# report/ 以下のみ読み取り許可
-aws s3api put-bucket-policy --bucket your-project-logserver --policy '{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadForReportImages",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::your-project-logserver/report/*"
-    }
-  ]
-}'
+# バケットポリシーが付いていないことを確認（NoSuchBucketPolicy と返れば正常）
+aws s3api get-bucket-policy --bucket your-project-logserver
 ```
 
 > `your-project-logserver` はすべて Step 3-1 で作成したバケット名に置き換えてください。
+
+> 既存のバケットを流用する場合、匿名読み取り（`Principal: "*"` の `s3:GetObject`）を許可するバケットポリシーが付いていたら外してから、上記のパブリックアクセスブロックを設定します。
+>
+> ```bash
+> aws s3api get-bucket-policy --bucket your-project-logserver --query Policy --output text > bucket-policy.backup.json
+> aws s3api delete-bucket-policy --bucket your-project-logserver
+> ```
+>
+> 他の用途のステートメントが同じポリシーに含まれる場合は、`delete-bucket-policy` ではなく該当ステートメントだけを除いた JSON を `put-bucket-policy` で書き戻します。切り替えの順序は「アプリを署名付き URL 対応の版に更新してから、ポリシーを外す」です（更新前にポリシーを外すと管理画面の画像が表示されなくなります）。
+
+署名付き URL の注意点:
+
+- 期限内なら URL を知る誰でも画像を開けます。チャットやメモには画像 URL ではなくレポートの詳細ページ URL（`/buglog/detail/<id>`）を貼ってください
+- 管理画面を期限より長く開いたままにすると画像が表示されなくなります。ページを再読み込みすれば新しい URL で表示されます
+- 署名はサーバーの時計を使います。時刻が数分ずれると S3 が `RequestTimeTooSkewed` を返すので、インスタンスで時刻同期（chrony 等）が動いていることを確認してください
 
 ### 3-3. S3アクセス用のIAMユーザーを作成
 
@@ -476,6 +480,8 @@ AWS_ACCESS_KEY_ID=<S3用アクセスキーID>
 AWS_SECRET_ACCESS_KEY=<S3用シークレットアクセスキー>
 AWS_S3_BUCKET_NAME=<Step 3-1 で作成したバケット名>
 AWS_REGION=ap-northeast-1
+# スクリーンショット URL（署名付き）の有効期限（秒）。任意。既定 1800 = 30 分、60〜604800
+# S3_PRESIGN_EXPIRE_SECONDS=1800
 
 # Admin credentials（初回起動時に作成される管理者アカウント）
 ADMIN_USERNAME=admin

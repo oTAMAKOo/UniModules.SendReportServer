@@ -55,6 +55,8 @@ REPORT_AES_KEY=0123456789abcdef
 REPORT_AES_IV=abcdef0123456789
 
 # Storage mode: "local" or "s3"
+# local は /storage/ 配下を nginx が認証なしで直接配信する（開発用途。画像を保護しない）。
+# s3 は期限付きの署名付き URL で配信する（S3_PRESIGN_EXPIRE_SECONDS、既定 30 分）。
 STORAGE_MODE=local
 LOCAL_STORAGE_PATH=/app/storage
 

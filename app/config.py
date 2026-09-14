@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     aws_s3_bucket_name: str = ""
     aws_region: str = "ap-northeast-1"
 
+    # S3 モードのスクリーンショット URL（署名付き）の有効期限（秒）。管理画面の表示と
+    # MCP / 読み取り API の Markdown に載る URL の両方に効く。バケット自体は非公開にする。
+    # 60〜604800（AWS の上限 7 日）。範囲外は起動エラー。
+    s3_presign_expire_seconds: int = 1800
+
     admin_username: str = "admin"
     admin_password: str = "password"
     # ロックアウト復旧用。ADMIN_USERNAME のアカウントに紐付け、起動のたびに
@@ -82,6 +87,16 @@ class Settings(BaseSettings):
     @classmethod
     def _normalize_admin_google_email(cls, value: str) -> str:
         return value.strip().lower()
+
+    @field_validator("s3_presign_expire_seconds")
+    @classmethod
+    def _validate_s3_presign_expire_seconds(cls, value: int) -> int:
+        """署名付き URL の有効期限は 60 秒〜7 日（AWS の上限）に限る。STORAGE_MODE に関わらず検証する。"""
+        if not 60 <= value <= 604800:
+            raise ValueError(
+                "S3_PRESIGN_EXPIRE_SECONDS は 60〜604800（秒）の範囲で指定してください（既定 1800 = 30 分）"
+            )
+        return value
 
     @field_validator("mail_mode")
     @classmethod

@@ -55,7 +55,8 @@ cp .env.example .env
 | `SECRET_KEY` | セッション署名用。プロジェクト毎にランダム文字列を設定する |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 起動時に作られる初期管理者。初回ログイン後に変更する |
 | `DATABASE_URL` | 既定の Docker Compose 構成のままなら変更不要 |
-| `STORAGE_MODE` | `local`（既定）または `s3`。`s3` の場合は `AWS_*` を設定する |
+| `STORAGE_MODE` | `local`（既定）または `s3`。`s3` の場合は `AWS_*` を設定する。`s3` ではスクリーンショットを期限付きの署名付き URL で配信するのでバケットは非公開のままにする（`local` は `/storage/` を認証なしで配信する開発用途） |
+| `S3_PRESIGN_EXPIRE_SECONDS` | `s3` の署名付き URL の有効期限（秒）。既定 `1800`（30 分）、60〜604800 |
 | `PUBLIC_BASE_URL` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google ログインを使う場合に設定する（任意）。未設定ならパスワード認証のみ |
 | `ADMIN_GOOGLE_EMAIL` | ロックアウト復旧用（任意）。起動のたびに管理者権限を保証する Google アカウント |
 | `MCP_ENABLED` | Claude Code 向け MCP サーバー（`/buglog/mcp`）を公開するか（既定 `true`） |

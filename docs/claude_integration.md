@@ -150,7 +150,7 @@ ID だけ（`#123`）でも通る。
 | BuildNumber | 1234 |
 | BranchName | develop |
 | ログ件数 | 87（エラー・例外 2 件） |
-| スクリーンショット | https://.../report/images/....png |
+| スクリーンショット | https://<bucket>.s3.ap-northeast-1.amazonaws.com/report/images/....png?X-Amz-Algorithm=...&X-Amz-Expires=1800&X-Amz-Signature=... |
 | 詳細ページ | https://<FQDN>/buglog/detail/123 |
 
 ## エラー・例外の要約
@@ -211,6 +211,7 @@ curl -H "Authorization: Bearer $BUGLOG_TOKEN" "https://<FQDN>/buglog/api/reports
 - **有効期限**: 発行時に無期限 / 30 / 90 / 365 日から選ぶ。既定は 90 日
 - **MCP を止める**: `.env` に `MCP_ENABLED=false` を書いてコンテナを再作成する。`/buglog/mcp` が 404 になる。読み取り API は残る
 - **`.env` の `PUBLIC_BASE_URL`**: 設定しておくと、Markdown 内の詳細ページ URL と（local ストレージ時の）スクリーンショット URL が絶対 URL になる。未設定だとプレフィックスからの相対パスになり、Claude が画像を開けない
+- **スクリーンショット URL の期限**: S3 ストレージ時の画像 URL は署名付きで、`get_report` を呼んだ時点から `S3_PRESIGN_EXPIRE_SECONDS`（既定 1800 秒 = 30 分）で失効する。Markdown を保存しても画像リンクは後で切れる。再取得は `get_report` を呼び直す（詳細ページ URL やレポート ID には期限が無い）。期限内は URL を知る誰でも画像を開けるので、チャットやノートには画像 URL ではなく詳細ページ URL かレポート ID を貼る
 - **本番更新**: 依存パッケージ（`mcp`）が増えているため、更新時は必ず `up -d --build` でイメージを作り直す。マイグレーション 006（`api_token` テーブル）は起動時に自動適用される
 
 ## 9. トラブルシューティング
@@ -225,6 +226,8 @@ curl -H "Authorization: Bearer $BUGLOG_TOKEN" "https://<FQDN>/buglog/api/reports
 | 429 が返る | 1 分 120 回の上限。同じ IP から複数人が使っている場合は上限に当たりやすい。少し待つ |
 | Claude が URL を貼っても WebFetch しようとする | `.mcp.json` が読まれていない（承認していない）か、ツールの存在に気づいていない。「`get_report` で読んで」と明示するか、`CLAUDE.md` に一文足す（5. を参照） |
 | Markdown 内のスクリーンショット URL が相対パス | `.env` の `PUBLIC_BASE_URL` が未設定。設定してコンテナを再作成する |
+| 画像 URL を開くと 403（`Request has expired`） | 署名付き URL の期限切れ（既定 30 分）。管理画面ならページを再読み込み、Claude なら `get_report` を呼び直して新しい URL を得る |
+| 画像 URL を開くと 403（`RequestTimeTooSkewed`） | サーバーの時計がずれている。インスタンスの時刻同期（chrony 等）を確認する |
 | 「Markdown をコピー」が `HTTP 401` | ブラウザのセッションが切れている。再ログインする |
 | サーバー起動時に `RuntimeError: Task group is not initialized` | `main.py` の lifespan で `mcp_server.session_lifespan()` が呼ばれていない。`MCP_ENABLED` とマウントの条件が食い違っていないか確認する |
 | nginx 経由で MCP が 421 を返す | SDK の DNS リバインディング保護が有効になっている。`mcp_server.py` で `enable_dns_rebinding_protection=False` を渡しているか確認する |

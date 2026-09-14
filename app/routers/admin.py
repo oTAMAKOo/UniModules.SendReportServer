@@ -471,21 +471,17 @@ async def system_config_page(request: Request, db: Session = Depends(get_db)):
     if not user or not user.is_superuser:
         return redirect("/login")
 
-    aes_key = get_config_value(db, "aes_key", settings.report_aes_key)
-    aes_iv = get_config_value(db, "aes_iv", settings.report_aes_iv)
     session_hours = get_config_value(db, "session_hours", "24")
 
     return templates.TemplateResponse(
         "system_config.html",
-        {"request": request, "user": user.username, "aes_key": aes_key, "aes_iv": aes_iv, "session_hours": session_hours, "csrf_token": csrf_token_for(user), "message": None, "error": None},
+        {"request": request, "user": user.username, "session_hours": session_hours, "csrf_token": csrf_token_for(user), "message": None, "error": None},
     )
 
 
 @router.post("/system", response_class=HTMLResponse)
 async def system_config_submit(
     request: Request,
-    aes_key: str = Form(...),
-    aes_iv: str = Form(...),
     session_hours: str = Form("24"),
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
@@ -497,14 +493,7 @@ async def system_config_submit(
     if not verify_csrf(csrf_token, user):
         return redirect("/login")
 
-    tpl_vars = {"request": request, "user": user.username, "aes_key": aes_key, "aes_iv": aes_iv, "session_hours": session_hours, "csrf_token": csrf_token_for(user), "message": None, "error": None}
-
-    if len(aes_key.encode("utf-8")) != 32:
-        tpl_vars["error"] = "AES Keyは32文字で指定してください"
-        return templates.TemplateResponse("system_config.html", tpl_vars)
-    if len(aes_iv.encode("utf-8")) != 16:
-        tpl_vars["error"] = "AES IVは16文字で指定してください"
-        return templates.TemplateResponse("system_config.html", tpl_vars)
+    tpl_vars = {"request": request, "user": user.username, "session_hours": session_hours, "csrf_token": csrf_token_for(user), "message": None, "error": None}
 
     try:
         hours = int(session_hours)
@@ -514,8 +503,6 @@ async def system_config_submit(
         tpl_vars["error"] = "セッション有効期限は1〜8760（時間）の整数で入力してください"
         return templates.TemplateResponse("system_config.html", tpl_vars)
 
-    set_config_value(db, "aes_key", aes_key)
-    set_config_value(db, "aes_iv", aes_iv)
     set_config_value(db, "session_hours", str(hours))
     db.commit()
 
@@ -661,7 +648,7 @@ async def report_list(
     # サムネイルURLを付与
     for r in reports:
         if r.img_thumbnail_name:
-            r.thumb_url = get_image_url(f"report/thumbnail/{r.img_thumbnail_name}")
+            r.thumb_url = get_image_url(r.img_thumbnail_name)
         else:
             r.thumb_url = None
 
@@ -731,8 +718,8 @@ async def report_detail(
     img_url = None
     thumb_url = None
     if report.img_name:
-        img_url = get_image_url(f"report/images/{report.img_name}")
-        thumb_url = get_image_url(f"report/thumbnail/{report.img_thumbnail_name}")
+        img_url = get_image_url(report.img_name)
+        thumb_url = get_image_url(report.img_thumbnail_name) if report.img_thumbnail_name else img_url
 
     extend_info = {}
     if report.extend_info:

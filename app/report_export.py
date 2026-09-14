@@ -143,7 +143,7 @@ def report_to_dict(report: ReportData) -> dict:
         "user_name": report.user_name,
         "device_model": report.device_model,
         "extend_info": parse_extend_info(report.extend_info),
-        "screenshot_url": absolute_image_url(f"report/images/{report.img_name}") if report.img_name else None,
+        "screenshot_url": absolute_image_url(report.img_name) if report.img_name else None,
         "detail_url": report_detail_url(report.id),
         "logs": [
             {
@@ -183,7 +183,7 @@ def report_to_markdown(report: ReportData) -> str:
         lines.append(f"| {_escape_cell(str(key))} | {_escape_cell(str(value))} |")
     lines.append(f"| ログ件数 | {len(entries)}（エラー・例外 {len(errors)} 件） |")
     if report.img_name:
-        lines.append(f"| スクリーンショット | {absolute_image_url(f'report/images/{report.img_name}')} |")
+        lines.append(f"| スクリーンショット | {absolute_image_url(report.img_name)} |")
     lines.append(f"| 詳細ページ | {report_detail_url(report.id)} |")
     lines.append("")
 

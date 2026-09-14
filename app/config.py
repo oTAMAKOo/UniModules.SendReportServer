@@ -5,8 +5,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     database_url: str = "postgresql://logserver:logserver@db:5432/logserver"
 
-    report_aes_key: str = "0123456789abcdef"
-    report_aes_iv: str = "abcdef0123456789"
+    # AES Key/IV はプロジェクトごとに DB（project テーブル）で管理する。
+    # 旧 REPORT_AES_KEY / REPORT_AES_IV はマイグレーション 007 が最初のプロジェクトを作るときに
+    # 環境変数として直接読むだけで、Settings には含めない（extra="ignore" で残っていても無害）。
 
     storage_mode: str = "local"  # "local" or "s3"
     local_storage_path: str = "/app/storage"

@@ -26,13 +26,18 @@ def _generate_filename() -> str:
     return now.strftime("%Y%m%d_%H%M%S_%f") + ".png"
 
 
-def save_screenshot(base64_data: str) -> tuple[str, str]:
-    """スクリーンショットを保存し、(画像ファイル名, サムネイルファイル名) を返す。"""
+def save_screenshot(base64_data: str, project_slug: str) -> tuple[str, str]:
+    """スクリーンショットを保存し、(画像のストレージキー, サムネイルのストレージキー) を返す。
+
+    キーは report/<slug>/images/<file> と report/<slug>/thumbnail/thumbnail_<file>。
+    DB にはこのキー全体を保存し、表示・削除時はそのまま使う。
+    """
     img_data = b64decode(base64_data)
     img = Image.open(BytesIO(img_data))
 
     filename = _generate_filename()
-    thumbnail_filename = "thumbnail_" + filename
+    img_key = f"report/{project_slug}/images/{filename}"
+    thumb_key = f"report/{project_slug}/thumbnail/thumbnail_{filename}"
 
     img_bytes = BytesIO()
     img.save(img_bytes, format="PNG")
@@ -44,13 +49,13 @@ def save_screenshot(base64_data: str) -> tuple[str, str]:
     thumb_bytes.seek(0)
 
     if settings.storage_mode == "s3":
-        _save_to_s3(f"report/images/{filename}", img_bytes)
-        _save_to_s3(f"report/thumbnail/{thumbnail_filename}", thumb_bytes)
+        _save_to_s3(img_key, img_bytes)
+        _save_to_s3(thumb_key, thumb_bytes)
     else:
-        _save_to_local(f"report/images/{filename}", img_bytes)
-        _save_to_local(f"report/thumbnail/{thumbnail_filename}", thumb_bytes)
+        _save_to_local(img_key, img_bytes)
+        _save_to_local(thumb_key, thumb_bytes)
 
-    return filename, thumbnail_filename
+    return img_key, thumb_key
 
 
 def get_image_url(path: str) -> str:
@@ -69,20 +74,13 @@ def get_image_url(path: str) -> str:
     return f"/storage/{path}"
 
 
-def delete_screenshot(img_name: str, thumbnail_name: str) -> None:
-    """スクリーンショットとサムネイルを削除する。
+def delete_screenshot(img_key: str | None, thumb_key: str | None) -> None:
+    """スクリーンショットとサムネイルを削除する。引数は DB に保存されたストレージキー全体。
 
     保存先は settings.storage_mode に従う。存在しないファイル・キーを指定しても
     例外にはしない（DB行だけ消えて画像が孤児として残るのを避けるため）。
     """
-    paths = []
-
-    if img_name:
-        paths.append(f"report/images/{img_name}")
-
-    if thumbnail_name:
-        paths.append(f"report/thumbnail/{thumbnail_name}")
-
+    paths = [key for key in (img_key, thumb_key) if key]
     if not paths:
         return
 

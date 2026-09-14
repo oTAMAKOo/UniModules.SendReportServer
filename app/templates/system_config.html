@@ -46,17 +46,6 @@
     <form method="post" action="{{ PREFIX }}/system">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="mb-3">
-            <label for="aes_key" class="form-label">AES Key</label>
-            <input type="text" class="form-control" id="aes_key" name="aes_key" value="{{ aes_key }}" required>
-            <div class="form-text">32文字（AES-256）</div>
-        </div>
-        <div class="mb-3">
-            <label for="aes_iv" class="form-label">AES IV</label>
-            <input type="text" class="form-control" id="aes_iv" name="aes_iv" value="{{ aes_iv }}" required>
-            <div class="form-text">16文字</div>
-        </div>
-        <hr style="border-color: var(--border-color); margin: 20px 0;">
-        <div class="mb-3">
             <label for="session_hours" class="form-label">セッション有効期限</label>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="number" class="form-control" id="session_hours" name="session_hours" value="{{ session_hours }}" min="1" max="8760" style="width: 120px;" required>
@@ -66,5 +55,7 @@
         </div>
         <button type="submit" class="btn btn-primary">保存</button>
     </form>
+    <hr style="border-color: var(--border-color); margin: 20px 0;">
+    <div class="form-text">AES Key / IV はプロジェクトごとに設定します（<a href="{{ PREFIX }}/admin/projects">プロジェクト管理</a>、または各プロジェクトの設定画面）。</div>
 </div>
 {% endblock %}

@@ -3,10 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.auth import ensure_default_admin
+from app.auth import ensure_admin_google_email, ensure_default_admin
 from app.config import settings
 from app.database import SessionLocal
-from app.routers import api, admin
+from app.routers import api, admin, google_auth
 
 
 @asynccontextmanager
@@ -14,6 +14,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         ensure_default_admin(db)
+        ensure_admin_google_email(db)
     finally:
         db.close()
     yield
@@ -23,9 +24,11 @@ app = FastAPI(title="Log Server", docs_url="/docs", redoc_url=None, lifespan=lif
 
 app.include_router(api.router, prefix=settings.url_prefix)
 app.include_router(admin.router, prefix=settings.url_prefix)
+app.include_router(google_auth.router, prefix=settings.url_prefix)
 
-# Jinja2テンプレートにURLプレフィックスをグローバル変数として渡す
+# Jinja2テンプレートにURLプレフィックスと Google ログインの有効状態をグローバル変数として渡す
 admin.templates.env.globals["PREFIX"] = settings.url_prefix
+admin.templates.env.globals["GOOGLE_ENABLED"] = settings.google_enabled
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 

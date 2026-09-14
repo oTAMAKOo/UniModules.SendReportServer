@@ -33,8 +33,31 @@ class AdminUser(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Google 専用ユーザーは NULL（パスワードログイン不可）
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Google ログインの許可リスト。小文字で保存する。NULL なら Google ログイン不可。
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    # Google アカウントの一意 ID（ID トークンの sub）。初回 Google ログインで紐付く。
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    @property
+    def has_password(self) -> bool:
+        return self.password_hash is not None
+
+    @property
+    def has_google(self) -> bool:
+        return self.email is not None
+
+    @property
+    def is_invite_pending(self) -> bool:
+        """招待済みだが初回 Google ログイン待ちの状態（他のログイン手段も持たない）。"""
+        return (
+            self.email is not None
+            and self.google_sub is None
+            and self.password_hash is None
+            and not self.is_active
+        )

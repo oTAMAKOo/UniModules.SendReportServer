@@ -1,5 +1,6 @@
 import json
 import math
+import re
 import secrets
 import string
 
@@ -11,10 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.auth import (
     check_credentials,
+    create_invite_token,
     create_session_token,
     generate_csrf_token,
     get_session_max_age,
     hash_password,
+    normalize_email,
     verify_csrf_token,
     verify_password,
     verify_session_token,
@@ -22,6 +25,7 @@ from app.auth import (
 )
 from app.config import settings
 from app.database import get_db
+from app.mail import MailError, mail_enabled, send_invite_mail
 from app.models import AdminUser, ReportData, SystemConfig
 from app.ratelimit import login_limiter
 from app.storage import delete_screenshot, get_image_url
@@ -125,13 +129,56 @@ def _check_and_create_emergency_admin(db: Session) -> dict | None:
     return {"username": username, "password": password}
 
 
-def _users_page_with_emergency(request: Request, user: AdminUser, db: Session, emergency: dict | None = None):
-    """ユーザー一覧ページを返すヘルパー。緊急アカウント情報がある場合は警告を表示。"""
+def _users_page(request: Request, user: AdminUser, db: Session, **context):
+    """ユーザー一覧ページを返すヘルパー。
+
+    context には error（エラー文）、emergency（緊急アカウント情報）、
+    invite（発行した招待リンクの情報）を渡せる。
+    """
     users = db.query(AdminUser).order_by(AdminUser.id).all()
     return templates.TemplateResponse(
         "user_list.html",
-        {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user), "emergency": emergency},
+        {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user), **context},
     )
+
+
+def _is_last_active_superuser(db: Session, target: AdminUser) -> bool:
+    """target を降格・無効化・削除すると有効な管理者が 0 人になるか。"""
+    if not (target.is_superuser and target.is_active):
+        return False
+    count = db.query(AdminUser).filter(
+        AdminUser.is_superuser == True,
+        AdminUser.is_active == True,
+    ).count()
+    return count <= 1
+
+
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _is_valid_email(email: str) -> bool:
+    return bool(_EMAIL_PATTERN.match(email)) and len(email) <= 255
+
+
+def _issue_invite(target: AdminUser) -> dict:
+    """招待リンクを発行し、MAIL_MODE に応じてメールを送る。画面表示用の情報を返す。"""
+    token = create_invite_token(target)
+    url = f"{settings.public_base_url}{settings.url_prefix}/invite/{token}"
+    result = {
+        "username": target.username,
+        "email": target.email,
+        "url": url,
+        "expire_hours": settings.invite_expire_hours,
+        "mail_sent": False,
+        "mail_error": None,
+    }
+    if mail_enabled():
+        try:
+            send_invite_mail(target.email, target.username, url)
+            result["mail_sent"] = True
+        except MailError as e:
+            result["mail_error"] = str(e)
+    return result
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -195,16 +242,32 @@ async def password_change_page(request: Request, db: Session = Depends(get_db)):
     user = _get_current_user(request, db)
     if not user:
         return _redirect("/login")
+    return _password_change_page(request, user)
+
+
+def _password_change_page(request: Request, user: AdminUser, message: str | None = None, error: str | None = None):
+    """パスワード変更ページを返すヘルパー。
+
+    Google 専用ユーザー（パスワード未設定）には「パスワードを設定する」画面として
+    表示し、現在のパスワードの入力は求めない。
+    """
     return templates.TemplateResponse(
         "password_change.html",
-        {"request": request, "user": user.username, "csrf_token": _csrf_token_for(user), "message": None, "error": None},
+        {
+            "request": request,
+            "user": user.username,
+            "csrf_token": _csrf_token_for(user),
+            "has_password": user.has_password,
+            "message": message,
+            "error": error,
+        },
     )
 
 
 @router.post("/password_change", response_class=HTMLResponse)
 async def password_change_submit(
     request: Request,
-    old_password: str = Form(...),
+    old_password: str = Form(""),
     new_password: str = Form(...),
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
@@ -216,24 +279,18 @@ async def password_change_submit(
     if not _verify_csrf(csrf_token, user):
         return _redirect("/login")
 
-    if not verify_password(old_password, user.password_hash):
-        return templates.TemplateResponse(
-            "password_change.html",
-            {"request": request, "user": user.username, "csrf_token": _csrf_token_for(user), "message": None, "error": "現在のパスワードが正しくありません"},
-        )
+    # パスワード未設定（Google 専用）のユーザーは現在のパスワード無しで設定できる。
+    # セッションが Google 認証で確立済みであることが本人確認の代わりになる。
+    if user.has_password and not verify_password(old_password, user.password_hash):
+        return _password_change_page(request, user, error="現在のパスワードが正しくありません")
 
     if len(new_password) < 4:
-        return templates.TemplateResponse(
-            "password_change.html",
-            {"request": request, "user": user.username, "csrf_token": _csrf_token_for(user), "message": None, "error": "新しいパスワードは4文字以上で入力してください"},
-        )
+        return _password_change_page(request, user, error="新しいパスワードは4文字以上で入力してください")
 
+    message = "パスワードを変更しました" if user.has_password else "パスワードを設定しました。次回からパスワードでもログインできます"
     user.password_hash = hash_password(new_password)
     db.commit()
-    return templates.TemplateResponse(
-        "password_change.html",
-        {"request": request, "user": user.username, "csrf_token": _csrf_token_for(user), "message": "パスワードを変更しました", "error": None},
-    )
+    return _password_change_page(request, user, message=message)
 
 
 # --- User Management (superuser only) ---
@@ -245,22 +302,26 @@ async def user_list(request: Request, db: Session = Depends(get_db)):
     if not user or not user.is_superuser:
         return _redirect("/login")
 
-    users = db.query(AdminUser).order_by(AdminUser.id).all()
-    return templates.TemplateResponse(
-        "user_list.html",
-        {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user)},
-    )
+    return _users_page(request, user, db)
 
 
 @router.post("/users/create", response_class=HTMLResponse)
 async def user_create(
     request: Request,
     username: str = Form(...),
+    login_method: str = Form("password"),
     password: str = Form(""),
+    email: str = Form(""),
     is_superuser: bool = Form(False),
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
+    """ユーザーを作成する。
+
+    login_method が "password" なら従来どおりパスワードユーザーを作る。
+    "google" なら email だけを持つ招待中ユーザー（is_active=False）を作り、
+    招待リンクを発行する。本人がリンクからその Google アカウントでログインすると有効化される。
+    """
     user = _get_current_user(request, db)
     if not user or not user.is_superuser:
         return _redirect("/login")
@@ -268,31 +329,45 @@ async def user_create(
     if not _verify_csrf(csrf_token, user):
         return _redirect("/login")
 
-    if len(username.strip()) < 1 or len(username) > 64:
-        users = db.query(AdminUser).order_by(AdminUser.id).all()
-        return templates.TemplateResponse(
-            "user_list.html",
-            {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user), "error": "ユーザー名は1〜64文字で入力してください"},
+    username = username.strip()
+    if len(username) < 1 or len(username) > 64:
+        return _users_page(request, user, db, error="ユーザー名は1〜64文字で入力してください")
+
+    existing = db.query(AdminUser).filter(AdminUser.username == username).first()
+    if existing:
+        return _users_page(request, user, db, error=f"ユーザー名 '{username}' は既に存在します")
+
+    if login_method == "google":
+        if not settings.google_enabled:
+            return _users_page(request, user, db, error="Google ログインが設定されていないため、Google ユーザーは作成できません（.env の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL）")
+
+        email = normalize_email(email)
+        if not email or not _is_valid_email(email):
+            return _users_page(request, user, db, error="メールアドレスの形式が正しくありません")
+
+        if db.query(AdminUser).filter(AdminUser.email == email).first():
+            return _users_page(request, user, db, error=f"メールアドレス '{email}' は既に登録されています")
+
+        new_user = AdminUser(
+            username=username,
+            password_hash=None,
+            email=email,
+            is_superuser=is_superuser,
+            is_active=False,
         )
+        db.add(new_user)
+        db.commit()
+        return _users_page(request, user, db, invite=_issue_invite(new_user))
+
+    if login_method != "password":
+        return _users_page(request, user, db, error="ログイン方法が不正です")
 
     # パスワード未入力時はデフォルト値を設定.
     if not password:
         password = "password"
 
     if len(password) < 4:
-        users = db.query(AdminUser).order_by(AdminUser.id).all()
-        return templates.TemplateResponse(
-            "user_list.html",
-            {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user), "error": "パスワードは4文字以上で入力してください"},
-        )
-
-    existing = db.query(AdminUser).filter(AdminUser.username == username).first()
-    if existing:
-        users = db.query(AdminUser).order_by(AdminUser.id).all()
-        return templates.TemplateResponse(
-            "user_list.html",
-            {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user), "error": f"ユーザー名 '{username}' は既に存在します"},
-        )
+        return _users_page(request, user, db, error="パスワードは4文字以上で入力してください")
 
     new_user = AdminUser(
         username=username,
@@ -320,11 +395,13 @@ async def user_delete(
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if target and target.id != user.id:
+        if _is_last_active_superuser(db, target):
+            return _users_page(request, user, db, error="最後の有効な管理者は削除できません")
         db.delete(target)
         db.commit()
         emergency = _check_and_create_emergency_admin(db)
         if emergency:
-            return _users_page_with_emergency(request, user, db, emergency)
+            return _users_page(request, user, db, emergency=emergency)
     return _redirect("/users")
 
 
@@ -344,11 +421,13 @@ async def user_toggle_active(
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if target and target.id != user.id:
+        if target.is_active and _is_last_active_superuser(db, target):
+            return _users_page(request, user, db, error="最後の有効な管理者は無効化できません")
         target.is_active = not target.is_active
         db.commit()
         emergency = _check_and_create_emergency_admin(db)
         if emergency:
-            return _users_page_with_emergency(request, user, db, emergency)
+            return _users_page(request, user, db, emergency=emergency)
     return _redirect("/users")
 
 
@@ -368,11 +447,13 @@ async def user_toggle_superuser(
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if target:
+        if target.is_superuser and _is_last_active_superuser(db, target):
+            return _users_page(request, user, db, error="最後の有効な管理者の権限は解除できません")
         target.is_superuser = not target.is_superuser
         db.commit()
         emergency = _check_and_create_emergency_admin(db)
         if emergency:
-            return _users_page_with_emergency(request, user, db, emergency)
+            return _users_page(request, user, db, emergency=emergency)
     return _redirect("/users")
 
 
@@ -392,17 +473,92 @@ async def user_reset_password(
         return _redirect("/login")
 
     if len(new_password) < 4:
-        users = db.query(AdminUser).order_by(AdminUser.id).all()
-        return templates.TemplateResponse(
-            "user_list.html",
-            {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user), "error": "パスワードは4文字以上で入力してください"},
-        )
+        return _users_page(request, user, db, error="パスワードは4文字以上で入力してください")
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if target:
         target.password_hash = hash_password(new_password)
         db.commit()
     return _redirect("/users")
+
+
+@router.post("/users/set_email/{user_id}", response_class=HTMLResponse)
+async def user_set_email(
+    request: Request,
+    user_id: int,
+    email: str = Form(""),
+    csrf_token: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """既存ユーザーに Google ログインを付与・変更・解除する。
+
+    email を設定すると招待リンクを発行する（本人が初回 Google ログインで連携）。
+    空で送ると連携を解除する。パスワードを持たないユーザーの解除は
+    ログイン手段が無くなるため拒否する。
+    """
+    user = _get_current_user(request, db)
+    if not user or not user.is_superuser:
+        return _redirect("/login")
+
+    if not _verify_csrf(csrf_token, user):
+        return _redirect("/login")
+
+    target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not target:
+        return _redirect("/users")
+
+    email = normalize_email(email)
+    if email is None:
+        if not target.has_password:
+            return _users_page(request, user, db, error=f"'{target.username}' はパスワードを持たないため、Google 連携を解除するとログインできなくなります。先にパスワードを設定してください")
+        target.email = None
+        target.google_sub = None
+        db.commit()
+        return _redirect("/users")
+
+    if not settings.google_enabled:
+        return _users_page(request, user, db, error="Google ログインが設定されていないため、Google 連携は設定できません（.env の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL）")
+
+    if not _is_valid_email(email):
+        return _users_page(request, user, db, error="メールアドレスの形式が正しくありません")
+
+    if email == target.email:
+        return _redirect("/users")
+
+    duplicate = db.query(AdminUser).filter(AdminUser.email == email, AdminUser.id != target.id).first()
+    if duplicate:
+        return _users_page(request, user, db, error=f"メールアドレス '{email}' は既に '{duplicate.username}' に登録されています")
+
+    target.email = email
+    # 別アドレスの持ち主が連携し直せるよう、既存の Google 連携は解除する
+    target.google_sub = None
+    db.commit()
+    return _users_page(request, user, db, invite=_issue_invite(target))
+
+
+@router.post("/users/reinvite/{user_id}", response_class=HTMLResponse)
+async def user_reinvite(
+    request: Request,
+    user_id: int,
+    csrf_token: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """招待リンクを再発行する（有効期限切れ・メール不達時用）。"""
+    user = _get_current_user(request, db)
+    if not user or not user.is_superuser:
+        return _redirect("/login")
+
+    if not _verify_csrf(csrf_token, user):
+        return _redirect("/login")
+
+    target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not target or not target.has_google or target.google_sub is not None:
+        return _redirect("/users")
+
+    if not settings.google_enabled:
+        return _users_page(request, user, db, error="Google ログインが設定されていないため、招待リンクは発行できません")
+
+    return _users_page(request, user, db, invite=_issue_invite(target))
 
 
 # --- System Config ---

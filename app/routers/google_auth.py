@@ -7,6 +7,7 @@ Google ログインで AdminUser が新規作成されることはない。許�
 「AdminUser.email に一致するレコードが既に在るか」のみで、初回ログイン時に
 行うのは google_sub の保存（と招待の受諾による有効化）だけ。
 """
+import logging
 import secrets
 from datetime import datetime
 
@@ -19,6 +20,7 @@ from app.auth import (
     OAUTH_STATE_COOKIE,
     OAUTH_STATE_MAX_AGE,
     SESSION_COOKIE,
+    cookie_secure,
     create_oauth_state,
     create_session_token,
     get_session_max_age,
@@ -28,7 +30,10 @@ from app.auth import (
 from app.config import settings
 from app.database import get_db
 from app.models import AdminUser
+from app.ratelimit import oauth_limiter
 from app.routers.admin import _redirect, templates
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -62,6 +67,7 @@ def _start_google_auth(invite_email: str | None = None) -> RedirectResponse:
         OAUTH_STATE_COOKIE,
         create_oauth_state(payload),
         httponly=True,
+        secure=cookie_secure(),
         max_age=OAUTH_STATE_MAX_AGE,
         samesite="lax",
     )
@@ -69,8 +75,9 @@ def _start_google_auth(invite_email: str | None = None) -> RedirectResponse:
 
 
 @router.get("/auth/google")
-async def google_login():
+async def google_login(request: Request):
     _require_google_enabled()
+    oauth_limiter.check(request)
     return _start_google_auth()
 
 
@@ -81,7 +88,10 @@ async def invite_accept(token: str, request: Request, db: Session = Depends(get_
     防衛線はリンクではなくコールバックでの email 照合なので、リンク自体は
     使用済み管理をしない。有効期限切れでもログイン画面の Google ボタンから入れる。
     """
-    _require_google_enabled()
+    if not settings.google_enabled:
+        # メール等で受け取ったリンクを開く人向けに、JSON の 404 ではなく画面で伝える
+        return _login_error(request, "Google ログインは現在無効になっています。管理者に連絡してください")
+    oauth_limiter.check(request)
     payload = verify_invite_token(token)
     if not payload:
         return _login_error(request, "招待リンクが無効か、有効期限が切れています。管理者に再発行を依頼してください")
@@ -106,24 +116,29 @@ async def google_callback(
     db: Session = Depends(get_db),
 ):
     _require_google_enabled()
+    oauth_limiter.check(request)
 
     payload = verify_oauth_state(request.cookies.get(OAUTH_STATE_COOKIE))
     expected_state = str(payload.get("state", "")) if payload else ""
     if not expected_state or not state or not secrets.compare_digest(expected_state.encode(), state.encode()):
+        logger.info("Google callback を拒否: state が無効（Cookie 期限切れ・欠落・不一致）")
         return _login_error(request, "認証セッションが無効です。もう一度ログインしてください")
 
     if error or not code:
         # 同意画面でキャンセルされた等
+        logger.info("Google ログインがキャンセルされました: error=%s", error)
         return _login_error(request, "Google ログインがキャンセルされました")
 
     try:
         claims = await google_auth.exchange_code(code)
         sub, email = google_auth.verify_claims(claims, payload.get("nonce", ""))
     except google_auth.GoogleAuthError as e:
+        logger.warning("Google ログイン失敗: %s", e)
         return _login_error(request, str(e))
 
     invite_email = payload.get("invite_email")
     if invite_email and email != invite_email:
+        logger.warning("Google ログインを拒否: 招待先 %s と異なるアカウント %s", invite_email, email)
         return _login_error(
             request,
             f"招待されたアドレス（{invite_email}）と異なる Google アカウントでログインしました",
@@ -133,8 +148,10 @@ async def google_callback(
     if user is None:
         user = db.query(AdminUser).filter(AdminUser.email == email).first()
         if user is None:
+            logger.warning("Google ログインを拒否: 未招待のアドレス %s", email)
             return _login_error(request, "この Google アカウントは招待されていません。管理者に連絡してください")
         if user.google_sub is not None:
+            logger.warning("Google ログインを拒否: %s には別の Google アカウントが連携済み（user=%s）", email, user.username)
             return _login_error(
                 request,
                 "このメールアドレスには別の Google アカウントが連携されています。管理者に連絡してください",
@@ -143,19 +160,27 @@ async def google_callback(
             # 招待の受諾: 初回ログインで有効化する
             user.is_active = True
         elif not user.is_active:
+            logger.warning("Google ログインを拒否: user=%s は無効化されている", user.username)
             return _login_error(request, "このアカウントは無効化されています。管理者に連絡してください")
         user.google_sub = sub
+        logger.info("Google 連携を保存: user=%s email=%s", user.username, email)
     elif not user.is_active:
+        logger.warning("Google ログインを拒否: user=%s は無効化されている", user.username)
         return _login_error(request, "このアカウントは無効化されています。管理者に連絡してください")
+    elif user.email != email:
+        # sub は一致するが Google 側でアドレスが変わっている。識別子は sub なので通すが、記録は残す
+        logger.info("Google ログイン: user=%s のアドレスが変わっている（DB=%s, Google=%s）", user.username, user.email, email)
 
     user.last_login_at = datetime.utcnow()
     db.commit()
+    logger.info("Google ログイン成功: user=%s", user.username)
 
     response = _redirect("/list")
     response.set_cookie(
         SESSION_COOKIE,
         create_session_token(user.username),
         httponly=True,
+        secure=cookie_secure(),
         max_age=get_session_max_age(db),
     )
     response.delete_cookie(OAUTH_STATE_COOKIE)

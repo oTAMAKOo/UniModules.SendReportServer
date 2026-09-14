@@ -9,9 +9,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.auth import (
     check_credentials,
+    cookie_secure,
     create_invite_token,
     create_session_token,
     generate_csrf_token,
@@ -160,8 +162,12 @@ def _is_valid_email(email: str) -> bool:
     return bool(_EMAIL_PATTERN.match(email)) and len(email) <= 255
 
 
-def _issue_invite(target: AdminUser) -> dict:
-    """招待リンクを発行し、MAIL_MODE に応じてメールを送る。画面表示用の情報を返す。"""
+async def _issue_invite(target: AdminUser, note: str | None = None) -> dict:
+    """招待リンクを発行し、MAIL_MODE に応じてメールを送る。画面表示用の情報を返す。
+
+    メール送信（SMTP / SES）は同期 I/O なので、イベントループを塞いでレポート受信まで
+    止めないようスレッドプールで実行する。
+    """
     token = create_invite_token(target)
     url = f"{settings.public_base_url}{settings.url_prefix}/invite/{token}"
     result = {
@@ -171,10 +177,11 @@ def _issue_invite(target: AdminUser) -> dict:
         "expire_hours": settings.invite_expire_hours,
         "mail_sent": False,
         "mail_error": None,
+        "note": note,
     }
     if mail_enabled():
         try:
-            send_invite_mail(target.email, target.username, url)
+            await run_in_threadpool(send_invite_mail, target.email, target.username, url)
             result["mail_sent"] = True
         except MailError as e:
             result["mail_error"] = str(e)
@@ -209,7 +216,7 @@ async def login_submit(
     token = create_session_token(admin_user.username)
     max_age = get_session_max_age(db)
     response = _redirect("/list")
-    response.set_cookie(SESSION_COOKIE, token, httponly=True, max_age=max_age)
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=cookie_secure(), max_age=max_age)
     return response
 
 
@@ -357,7 +364,7 @@ async def user_create(
         )
         db.add(new_user)
         db.commit()
-        return _users_page(request, user, db, invite=_issue_invite(new_user))
+        return _users_page(request, user, db, invite=await _issue_invite(new_user))
 
     if login_method != "password":
         return _users_page(request, user, db, error="ログイン方法が不正です")
@@ -446,7 +453,7 @@ async def user_toggle_superuser(
         return _redirect("/login")
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
-    if target:
+    if target and target.id != user.id:
         if target.is_superuser and _is_last_active_superuser(db, target):
             return _users_page(request, user, db, error="最後の有効な管理者の権限は解除できません")
         target.is_superuser = not target.is_superuser
@@ -492,9 +499,14 @@ async def user_set_email(
 ):
     """既存ユーザーに Google ログインを付与・変更・解除する。
 
-    email を設定すると招待リンクを発行する（本人が初回 Google ログインで連携）。
-    空で送ると連携を解除する。パスワードを持たないユーザーの解除は
-    ログイン手段が無くなるため拒否する。
+    - email を新しく設定／変更すると招待リンクを発行する（本人が初回 Google ログインで連携）。
+      変更時は既存の Google 連携を解除し、新アドレスの持ち主が連携し直せるようにする
+    - 連携済みのユーザーに同じ email を送ると「再連携」（連携解除 + 招待再発行）。
+      Google アカウントを作り直して sub が変わった人の復旧経路
+    - 空で送ると連携を解除する。パスワードを持たないユーザーの解除はログイン手段が無くなるため拒否
+    - 無効化されたまま連携情報を書き換えると「招待中」と区別できず初回ログインで暗黙に有効化されるため、
+      連携済みで無効なユーザーは先に有効化してもらう
+    - パスワードを持たない最後の有効な管理者のアドレス変更は、誰も入れなくなるため拒否
     """
     user = _get_current_user(request, db)
     if not user or not user.is_superuser:
@@ -522,8 +534,22 @@ async def user_set_email(
     if not _is_valid_email(email):
         return _users_page(request, user, db, error="メールアドレスの形式が正しくありません")
 
+    if not target.is_active and target.google_sub is not None:
+        return _users_page(request, user, db, error=f"'{target.username}' は無効化されています。Google アカウントを変更・再連携する場合は先に有効化してください")
+
     if email == target.email:
-        return _redirect("/users")
+        if target.google_sub is None:
+            # 未連携で変更なし。リンクの再送は「招待リンク再発行」で行う
+            return _redirect("/users")
+        target.google_sub = None
+        db.commit()
+        return _users_page(request, user, db, invite=await _issue_invite(
+            target,
+            note="既存の Google 連携を解除しました。本人がこのアドレスの Google アカウントでログインし直すと再連携されます",
+        ))
+
+    if not target.has_password and _is_last_active_superuser(db, target):
+        return _users_page(request, user, db, error=f"'{target.username}' は最後の有効な管理者でパスワードを持たないため、Google アカウントを変更するとログインできなくなります。先にパスワードを設定してください")
 
     duplicate = db.query(AdminUser).filter(AdminUser.email == email, AdminUser.id != target.id).first()
     if duplicate:
@@ -533,7 +559,7 @@ async def user_set_email(
     # 別アドレスの持ち主が連携し直せるよう、既存の Google 連携は解除する
     target.google_sub = None
     db.commit()
-    return _users_page(request, user, db, invite=_issue_invite(target))
+    return _users_page(request, user, db, invite=await _issue_invite(target))
 
 
 @router.post("/users/reinvite/{user_id}", response_class=HTMLResponse)
@@ -558,7 +584,7 @@ async def user_reinvite(
     if not settings.google_enabled:
         return _users_page(request, user, db, error="Google ログインが設定されていないため、招待リンクは発行できません")
 
-    return _users_page(request, user, db, invite=_issue_invite(target))
+    return _users_page(request, user, db, invite=await _issue_invite(target))
 
 
 # --- System Config ---

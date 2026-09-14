@@ -12,9 +12,11 @@ class RateLimiter:
         self._requests: dict[str, list[float]] = defaultdict(list)
 
     def _get_client_ip(self, request: Request) -> str:
+        # nginx の $proxy_add_x_forwarded_for はクライアントが送ってきた値の「末尾」に実 IP を追記する。
+        # 先頭はクライアントが自由に偽装できるため、信頼できるプロキシが付けた末尾要素を使う。
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            return forwarded.split(",")[-1].strip()
         return request.client.host if request.client else "unknown"
 
     def _cleanup(self, ip: str, now: float):
@@ -41,3 +43,7 @@ report_limiter = RateLimiter(max_requests=60, window_seconds=60)
 
 # ログイン用: 1分間に10回まで（ブルートフォース対策）
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+
+# Google 認証用（/auth/google, /auth/google/callback, /invite/*）: 1分間に20回まで。
+# パスワード総当たりとは性質が違う（Google の token エンドポイントへの発信を第三者に誘発されるのを抑える）ため別カウンタ
+oauth_limiter = RateLimiter(max_requests=20, window_seconds=60)

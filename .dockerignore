@@ -1,0 +1,16 @@
+# Dockerfile の COPY . . でイメージに入れないもの。
+# .env はコンテナへ compose の env_file（環境変数）で渡すので、イメージに焼く必要はない
+# （焼くとシークレットがイメージ層に残る）。
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+docker-compose.prod.yml
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+storage/
+dummy/
+.claude/

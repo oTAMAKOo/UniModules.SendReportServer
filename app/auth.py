@@ -1,3 +1,5 @@
+import logging
+
 import bcrypt
 from itsdangerous import URLSafeTimedSerializer
 from sqlalchemy.exc import IntegrityError
@@ -5,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import AdminUser, SystemConfig
+
+logger = logging.getLogger(__name__)
 
 _serializer = URLSafeTimedSerializer(settings.secret_key)
 SESSION_COOKIE = "session_token"
@@ -34,6 +38,15 @@ def normalize_email(email: str | None) -> str | None:
         return None
     email = email.strip().lower()
     return email or None
+
+
+def cookie_secure() -> bool:
+    """Cookie に Secure 属性を付けるか。
+
+    nginx が TLS を終端するためアプリからは request のスキームで判定できない。
+    公開 URL が https なら Secure を付け、ローカル開発（http://127.0.0.1）では付けない。
+    """
+    return settings.public_base_url.startswith("https://")
 
 
 def create_session_token(username: str) -> str:
@@ -118,7 +131,11 @@ def ensure_default_admin(db: Session):
             is_superuser=True,
         )
         db.add(admin)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # 複数ワーカーが同時に起動して同じ行を作ろうとした場合。もう一方が成功している
+            db.rollback()
 
 
 def ensure_admin_google_email(db: Session):
@@ -137,18 +154,33 @@ def ensure_admin_google_email(db: Session):
     if user is None:
         user = db.query(AdminUser).filter(AdminUser.username == settings.admin_username).first()
         if user is not None:
+            if user.email or user.google_sub:
+                logger.warning(
+                    "ADMIN_GOOGLE_EMAIL: ユーザー '%s' の Google 連携（%s）を %s に置き換えます",
+                    user.username, user.email, email,
+                )
             # 別の Google アカウントが連携済みなら解除し、この email の持ち主が連携し直せるようにする
             user.google_sub = None
             user.email = email
         else:
+            # Google 専用（パスワード無し）で作る。ここで ADMIN_PASSWORD を付けると、admin を削除済みの
+            # 環境で .env の平文パスワード（既定値のままの可能性がある）でログインできる管理者が復活してしまう
+            logger.warning(
+                "ADMIN_GOOGLE_EMAIL: ユーザー '%s' が存在しないため、%s の Google 専用管理者として作成します",
+                settings.admin_username, email,
+            )
             user = AdminUser(
                 username=settings.admin_username,
-                password_hash=hash_password(settings.admin_password),
+                password_hash=None,
                 email=email,
                 is_superuser=True,
             )
             db.add(user)
 
+    if not user.is_superuser or not user.is_active:
+        logger.warning(
+            "ADMIN_GOOGLE_EMAIL: 復旧用アカウント '%s' を管理者権限・有効状態に戻しました", user.username
+        )
     user.is_superuser = True
     user.is_active = True
     try:

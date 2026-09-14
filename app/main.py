@@ -29,6 +29,8 @@ app.include_router(google_auth.router, prefix=settings.url_prefix)
 # Jinja2テンプレートにURLプレフィックスと Google ログインの有効状態をグローバル変数として渡す
 admin.templates.env.globals["PREFIX"] = settings.url_prefix
 admin.templates.env.globals["GOOGLE_ENABLED"] = settings.google_enabled
+# 復旧用アカウント（ADMIN_GOOGLE_EMAIL）をユーザー一覧で見分けるために渡す
+admin.templates.env.globals["ADMIN_GOOGLE_EMAIL"] = settings.admin_google_email
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 

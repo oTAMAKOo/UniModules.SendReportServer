@@ -9,12 +9,15 @@ TLS のサーバー検証が署名検証の代わりになるため。フロー�
 """
 import base64
 import json
+import logging
 import time
 from urllib.parse import urlencode
 
 import httpx
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
@@ -60,9 +63,13 @@ async def exchange_code(code: str) -> dict:
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             resp = await client.post(TOKEN_ENDPOINT, data=data)
     except httpx.HTTPError as e:
+        logger.warning("Google token エンドポイントへの要求に失敗: %s: %s", type(e).__name__, e)
         raise GoogleAuthError("Google との通信に失敗しました。しばらくしてから再試行してください") from e
 
     if resp.status_code != 200:
+        # invalid_client（シークレット誤り）や redirect_uri_mismatch の詳細は応答本文にしか出ない。
+        # 本文にシークレットは含まれないのでそのまま記録する
+        logger.warning("Google token 交換に失敗: status=%s body=%s", resp.status_code, resp.text[:500])
         raise GoogleAuthError("Google の認証に失敗しました（トークン交換エラー）")
 
     try:
@@ -91,7 +98,14 @@ def _decode_claims(id_token: str) -> dict:
 
 
 def verify_claims(claims: dict, nonce: str) -> tuple[str, str]:
-    """クレームを検証して (sub, email) を返す。email は小文字に正規化する。"""
+    """token エンドポイントから直接受け取った ID トークンのクレームを検証し (sub, email) を返す。
+
+    署名は検証しない。この関数に渡してよいのは exchange_code() が Google の token
+    エンドポイントから TLS 経由で受け取った ID トークンのクレームだけ。ブラウザ経由で
+    受け取った ID トークン（Google Identity Services の credential 等）に対して使うと
+    署名検証を欠いた認証バイパスになるので、その用途には JWKS 検証を別途実装すること。
+    email は小文字に正規化して返す。
+    """
     if claims.get("aud") != settings.google_client_id:
         raise GoogleAuthError("ID トークンの aud が一致しません")
     if claims.get("iss") not in ALLOWED_ISSUERS:

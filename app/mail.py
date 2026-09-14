@@ -6,9 +6,11 @@
 """
 import logging
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 import boto3
+from botocore.config import Config as BotoConfig
 
 from app.config import settings
 
@@ -61,6 +63,8 @@ def _send_ses(to_email: str, subject: str, body: str) -> None:
         aws_access_key_id=settings.aws_access_key_id or None,
         aws_secret_access_key=settings.aws_secret_access_key or None,
         region_name=settings.aws_region,
+        # 既定（接続・読み取り各 60 秒 + リトライ）だと SES 障害時に管理画面の操作が分単位で止まる
+        config=BotoConfig(connect_timeout=5, read_timeout=15, retries={"max_attempts": 2}),
     )
     client.send_email(
         Source=settings.mail_from,
@@ -82,7 +86,8 @@ def _send_smtp(to_email: str, subject: str, body: str) -> None:
     msg.set_content(body)
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
         if settings.smtp_starttls:
-            smtp.starttls()
+            # 既定の starttls() は証明書もホスト名も検証しないため、明示的に検証付きコンテキストを渡す
+            smtp.starttls(context=ssl.create_default_context())
         if settings.smtp_user:
             smtp.login(settings.smtp_user, settings.smtp_password)
         smtp.send_message(msg)

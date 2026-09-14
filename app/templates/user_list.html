@@ -85,6 +85,7 @@
     .badge-method { display: inline-block; background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; margin: 1px 0; }
     .badge-method.badge-google { background: #1f4f8a; color: #cfe3ff; }
     .badge-method.badge-google.pending { background: #4a4520; color: #e3c95a; }
+    .badge-recovery { background: #4b3a6b; color: #d9c8f5; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
     .user-email { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
     .user-timestamps {
         font-size: 11px;
@@ -233,6 +234,7 @@
 {% if invite %}
 <div class="alert alert-success invite-panel">
     <strong>{{ invite.username }}</strong>（{{ invite.email }}）への招待リンクを発行しました。
+    {% if invite.note %}<br>{{ invite.note }}{% endif %}
     {% if invite.mail_sent %}
     招待メールを送信しました。届かない場合は以下のリンクを直接伝えてください。
     {% elif invite.mail_error %}
@@ -329,6 +331,9 @@
             </td>
             <td>
                 {% if u.is_superuser %}<span class="badge-super">管理者</span>{% else %}<span class="badge-general">一般</span>{% endif %}
+                {% if ADMIN_GOOGLE_EMAIL and u.email == ADMIN_GOOGLE_EMAIL %}
+                <span class="badge-recovery" title=".env の ADMIN_GOOGLE_EMAIL に指定されたアカウント。無効化・降格しても再起動時に管理者権限・有効状態に戻ります">復旧用</span>
+                {% endif %}
             </td>
             <td>
                 {% if u.is_invite_pending %}
@@ -344,14 +349,14 @@
                             {% if u.is_superuser %}
                             <form method="post" action="{{ PREFIX }}/users/toggle_superuser/{{ u.id }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit" class="role-menu-item" onclick="return confirm('{{ u.username }} の管理者権限を外しますか？')">
+                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' の管理者権限を外しますか？')">
                                     <span class="badge-general" style="display:inline-block;">一般</span> に変更
                                 </button>
                             </form>
                             {% else %}
                             <form method="post" action="{{ PREFIX }}/users/toggle_superuser/{{ u.id }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit" class="role-menu-item" onclick="return confirm('{{ u.username }} に管理者権限を付与しますか？')">
+                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' に管理者権限を付与しますか？')">
                                     <span class="badge-super" style="display:inline-block;">管理者</span> に変更
                                 </button>
                             </form>
@@ -372,7 +377,7 @@
                         <button type="submit" class="btn btn-outline-info btn-sm" style="white-space:nowrap;">招待リンク再発行</button>
                     </form>
                     {% endif %}
-                    <form method="post" action="{{ PREFIX }}/users/delete/{{ u.id }}" style="display:inline;" onsubmit="return confirm('ユーザー \'{{ u.username }}\' を削除しますか？')">
+                    <form method="post" action="{{ PREFIX }}/users/delete/{{ u.id }}" style="display:inline;" data-username="{{ u.username }}" onsubmit="return confirm('ユーザー「' + this.dataset.username + '」を削除しますか？')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
                     </form>
@@ -389,12 +394,12 @@
                     <button type="button" class="btn btn-outline-info btn-sm" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
                 </div>
                 {% endif %}
-                <form method="post" action="{{ PREFIX }}/users/set_email/{{ u.id }}" class="inline-panel google-panel">
+                <form method="post" action="{{ PREFIX }}/users/set_email/{{ u.id }}" class="inline-panel google-panel" data-username="{{ u.username }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="email" name="email" class="form-control form-control-sm google-email-input" value="{{ u.email or '' }}" placeholder="user@gmail.com" autocomplete="off"{% if not GOOGLE_ENABLED %} disabled title="Google ログインが未設定です"{% endif %}>
                     <button type="submit" class="btn btn-info btn-sm" style="white-space:nowrap;"{% if not GOOGLE_ENABLED %} disabled{% endif %}>{% if u.has_google %}変更{% else %}招待{% endif %}</button>
                     {% if u.has_google %}
-                    <button type="submit" class="btn btn-outline-danger btn-sm" style="white-space:nowrap;" onclick="return unlinkGoogle(this, '{{ u.username }}')">解除</button>
+                    <button type="submit" class="btn btn-outline-danger btn-sm" style="white-space:nowrap;" onclick="return unlinkGoogle(this)">解除</button>
                     {% endif %}
                     <button type="button" class="btn btn-outline-neutral btn-sm" style="white-space:nowrap;" onclick="closeAllPanels()">キャンセル</button>
                 </form>
@@ -448,7 +453,9 @@ function updatePwBtn(input) {
     var btn = input.closest('.pw-reset-panel').querySelector('button[type="submit"]');
     btn.disabled = input.value.length < 4;
 }
-function unlinkGoogle(btn, username) {
+function unlinkGoogle(btn) {
+    // ユーザー名は JS 文字列に直接埋め込まず data 属性から読む（HTML エスケープでは JS 文字列を守れないため）
+    var username = btn.form.dataset.username;
     if (!confirm(username + ' の Google 連携を解除しますか？\nこのユーザーは Google でログインできなくなります。')) return false;
     // 空の email を送ると連携解除になる（サーバー側で判定）
     btn.form.querySelector('input[name="email"]').value = '';

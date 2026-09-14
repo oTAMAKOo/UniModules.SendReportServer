@@ -3,7 +3,8 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import settings
 
-engine = create_engine(settings.database_url)
+# pool_pre_ping: db コンテナの再作成などで切れた接続をプールから配る前に検知して張り直す
+engine = create_engine(settings.database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine)
 
 

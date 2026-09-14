@@ -66,8 +66,13 @@ class Settings(BaseSettings):
     @field_validator("public_base_url")
     @classmethod
     def _normalize_public_base_url(cls, value: str) -> str:
-        """末尾の "/" を除去する。"""
-        return value.strip().rstrip("/")
+        """末尾の "/" を除去し、スキームが http(s) であることを確認する。"""
+        value = value.strip().rstrip("/")
+        if value and not value.startswith(("http://", "https://")):
+            raise ValueError(
+                "PUBLIC_BASE_URL は http:// または https:// で始まる URL を指定してください（例: https://buglog.example.com）"
+            )
+        return value
 
     @field_validator("admin_google_email")
     @classmethod
@@ -86,7 +91,13 @@ class Settings(BaseSettings):
     def google_enabled(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret and self.public_base_url)
 
-    model_config = {"env_file": ".env"}
+    model_config = {
+        "env_file": ".env",
+        # 値が空のキー（SMTP_PORT= 等）は既定値にフォールバックさせる（既定では int 変換で起動失敗する）
+        "env_ignore_empty": True,
+        # .env に docker compose 用のキー（COMPOSE_PROJECT_NAME 等）が並んでいても起動を止めない
+        "extra": "ignore",
+    }
 
 
 settings = Settings()

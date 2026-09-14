@@ -789,6 +789,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs app --tail 
   `git pull` の影響を受けない。`nginx/nginx.conf`（9-3 で HTTPS 化）はローカル変更として残るため、
   上流でこのファイルが変わったときは `git stash` → `git pull` → `git stash pop` で取り込む
   （`git stash` にはコミッター名の設定が要る。下の切り替え手順で設定している）
+- **`nginx/nginx.conf` を編集したら nginx コンテナを再作成する**:
+  `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate nginx`（2〜3 秒 HTTPS が止まる）。
+  単一ファイルの bind mount は、`sed -i` やエディタが別 inode で書き直すと稼働中のコンテナには
+  反映されず、`nginx -t` / `nginx -s reload` も旧内容に対して「成功」してしまう。
+  反映確認は `docker compose ... exec -T nginx grep -c Strict-Transport-Security /etc/nginx/conf.d/default.conf`
+  のようにコンテナ内のファイルを見る
 
 #### 配置先が git 管理されていない場合
 
@@ -972,6 +978,13 @@ docker compose logs app | grep AES
 `docker-compose.prod.yml` の `db.command` がコメントアウトのまま。7-3 を見直して
 `up -d`（db が再作成され、数秒 DB が止まる）。`docker-compose.override.yml` に置いても
 `-f` 明示の起動では読み込まれない（7-4）。
+
+### `nginx/nginx.conf` を直したのに応答ヘッダやリダイレクトが変わらない
+
+単一ファイルの bind mount の落とし穴。`sed -i` やエディタで書き直すと inode が変わり、稼働中の
+nginx コンテナは旧ファイルを見続ける（`nginx -s reload` も旧内容を再読み込みするだけ）。
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate nginx` で
+コンテナを再作成する。確認はホスト側ではなくコンテナ内の `/etc/nginx/conf.d/default.conf` を見る。
 
 ### `git pull` が「not a git repository」になる
 

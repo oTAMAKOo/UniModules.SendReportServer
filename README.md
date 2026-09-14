@@ -17,7 +17,7 @@ UniModules.SendReportServer/
 ├── alembic.ini / alembic/  # DB マイグレーション
 ├── app/                    # FastAPI アプリ本体
 ├── nginx/nginx.conf
-└── docs/                   # ローカル構築・AWS デプロイ手順
+└── docs/                   # ローカル構築・AWS デプロイ手順・Claude Code 連携
 ```
 
 ## 他プロジェクトへの導入
@@ -58,6 +58,7 @@ cp .env.example .env
 | `STORAGE_MODE` | `local`（既定）または `s3`。`s3` の場合は `AWS_*` を設定する |
 | `PUBLIC_BASE_URL` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google ログインを使う場合に設定する（任意）。未設定ならパスワード認証のみ |
 | `ADMIN_GOOGLE_EMAIL` | ロックアウト復旧用（任意）。起動のたびに管理者権限を保証する Google アカウント |
+| `MCP_ENABLED` | Claude Code 向け MCP サーバー（`/buglog/mcp`）を公開するか（既定 `true`） |
 
 AES Key/IV とセッション有効期限は、起動後に管理画面のシステム設定（`/buglog/system`）からも変更できる。
 
@@ -90,6 +91,20 @@ AWS へのデプロイ手順は構成別に 3 種類ある。常時公開する�
 `aws_deploy_lightsail.md` の 12 章にある。
 
 デプロイ先のドメイン・EC2 インスタンス ID・SSH 鍵のパスは**プロジェクト毎に異なる**ため、このリポジトリには持たせていない。導入先プロジェクト側（例: `.claude/commands/` の運用コマンド、CI の設定）で管理する。
+
+## Claude Code からレポートを読む
+
+管理画面はログイン必須のため、レポートの URL をそのまま Claude に渡しても中身は読めない。
+代わりに **MCP サーバー**（`/buglog/mcp`）と**読み取り専用 API**（`/buglog/api/reports`）を用意しており、
+管理画面の「API トークン」で発行した個人トークンで認証する。
+
+1. 管理画面 → 管理メニュー → **API トークン** でトークンを発行する（各エンジニアが自分の分を発行）
+2. 発行したトークンを環境変数 `BUGLOG_TOKEN` に設定する
+3. 導入先プロジェクトの `.mcp.json` に MCP サーバーを登録する（トークンは `${BUGLOG_TOKEN}` で参照し、ファイルには書かない）
+4. レポートの URL（`/buglog/detail/<id>`）を Claude Code に貼ると、`get_report` ツールでログ全文を読んで調査できる
+
+設定手順・ツール一覧・トラブルシューティングは [docs/claude_integration.md](docs/claude_integration.md)。
+MCP サーバーは `.env` の `MCP_ENABLED=false` で無効化できる（読み取り API は常に有効）。
 
 ## クライアント側
 

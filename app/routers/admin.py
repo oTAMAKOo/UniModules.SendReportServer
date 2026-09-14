@@ -1,6 +1,7 @@
 import json
 import math
 import re
+from datetime import datetime, timedelta
 import secrets
 import string
 
@@ -15,6 +16,7 @@ from app.auth import (
     check_credentials,
     cookie_secure,
     create_invite_token,
+    generate_api_token,
     create_session_token,
     generate_csrf_token,
     get_session_max_age,
@@ -28,8 +30,9 @@ from app.auth import (
 from app.config import settings
 from app.database import get_db
 from app.mail import MailError, mail_enabled, send_invite_mail
-from app.models import AdminUser, ReportData, SystemConfig
+from app.models import AdminUser, ApiToken, ReportData, SystemConfig
 from app.ratelimit import login_limiter
+from app.report_export import format_log
 from app.storage import delete_screenshot, get_image_url
 
 router = APIRouter()
@@ -74,32 +77,8 @@ def _verify_csrf(request_token: str | None, user: AdminUser) -> bool:
     return username == user.username
 
 
-def _format_log(raw_log: str | None) -> list[dict]:
-    """ログテキストを表示用に整形する。"""
-    if not raw_log:
-        return []
-    try:
-        log_data = json.loads(raw_log)
-        if isinstance(log_data, dict) and "contents" in log_data:
-            entries = []
-            for item in log_data["contents"]:
-                if isinstance(item, dict):
-                    entries.append({
-                        "message": item.get("message", ""),
-                        "stacktrace": item.get("stackTrace", item.get("stacktrace", "")),
-                        "logType": item.get("type", item.get("logType", 3)),
-                    })
-                else:
-                    entries.append({
-                        "message": str(item),
-                        "stacktrace": "",
-                        "logType": 0,
-                    })
-            return entries
-        return [{"message": json.dumps(log_data, indent=2, ensure_ascii=False),
-                 "stacktrace": "", "logType": 0}]
-    except (json.JSONDecodeError, TypeError):
-        return [{"message": raw_log, "stacktrace": "", "logType": 0}]
+# ログの整形は MCP / API と共通化したため app/report_export.py にある
+_format_log = format_log
 
 
 # --- Login / Logout ---
@@ -892,3 +871,107 @@ async def report_detail(
             "csrf_token": _csrf_token_for(user),
         },
     )
+
+
+# --- API Tokens（Claude Code 等の外部クライアント用） ---
+
+API_TOKEN_MAX_ACTIVE = 10
+API_TOKEN_EXPIRE_CHOICES = (0, 30, 90, 365)  # 0 = 無期限
+
+
+def _tokens_page(request: Request, user: AdminUser, db: Session, **context):
+    """API トークン管理ページを返すヘルパー。context には new_token（発行直後の平文）、error を渡せる。"""
+    tokens = (
+        db.query(ApiToken)
+        .filter(ApiToken.user_id == user.id)
+        .order_by(desc(ApiToken.id))
+        .all()
+    )
+    base_url = settings.public_base_url or str(request.base_url).rstrip("/")
+    return templates.TemplateResponse(
+        "api_tokens.html",
+        {
+            "request": request,
+            "user": user.username,
+            "tokens": tokens,
+            "csrf_token": _csrf_token_for(user),
+            "mcp_enabled": settings.mcp_enabled,
+            "mcp_url": f"{base_url}{settings.url_prefix}/mcp",
+            "api_url": f"{base_url}{settings.url_prefix}/api/reports",
+            "expire_choices": API_TOKEN_EXPIRE_CHOICES,
+            "now": datetime.utcnow(),
+            **context,
+        },
+    )
+
+
+@router.get("/tokens", response_class=HTMLResponse)
+async def api_token_list(request: Request, db: Session = Depends(get_db)):
+    user = _get_current_user(request, db)
+    if not user:
+        return _redirect("/login")
+    return _tokens_page(request, user, db)
+
+
+@router.post("/tokens/create", response_class=HTMLResponse)
+async def api_token_create(
+    request: Request,
+    name: str = Form(""),
+    expires_days: str = Form("0"),
+    csrf_token: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """自分用の API トークンを発行する。平文はこの応答でだけ表示する。"""
+    user = _get_current_user(request, db)
+    if not user:
+        return _redirect("/login")
+    if not _verify_csrf(csrf_token, user):
+        return _redirect("/login")
+
+    name = name.strip()
+    if len(name) < 1 or len(name) > 100:
+        return _tokens_page(request, user, db, error="トークン名は1〜100文字で入力してください（例: 自分の PC 名）")
+
+    try:
+        days = int(expires_days)
+    except (TypeError, ValueError):
+        days = -1
+    if days not in API_TOKEN_EXPIRE_CHOICES:
+        return _tokens_page(request, user, db, error="有効期限の指定が不正です")
+
+    active_count = sum(1 for t in db.query(ApiToken).filter(ApiToken.user_id == user.id).all() if t.is_usable)
+    if active_count >= API_TOKEN_MAX_ACTIVE:
+        return _tokens_page(request, user, db, error=f"有効なトークンは {API_TOKEN_MAX_ACTIVE} 個までです。使っていないものを削除してください")
+
+    plain, token_hash, prefix = generate_api_token()
+    row = ApiToken(
+        user_id=user.id,
+        name=name,
+        token_hash=token_hash,
+        token_prefix=prefix,
+        expires_at=(datetime.utcnow() + timedelta(days=days)) if days > 0 else None,
+    )
+    db.add(row)
+    db.commit()
+    return _tokens_page(request, user, db, new_token={"name": name, "plain": plain})
+
+
+@router.post("/tokens/delete/{token_id}")
+async def api_token_delete(
+    request: Request,
+    token_id: int,
+    csrf_token: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """自分のトークンを削除する（= 失効。履歴は残さない）。他人のトークンは対象外。"""
+    user = _get_current_user(request, db)
+    if not user:
+        return _redirect("/login")
+    if not _verify_csrf(csrf_token, user):
+        return _redirect("/login")
+
+    row = db.query(ApiToken).filter(ApiToken.id == token_id, ApiToken.user_id == user.id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return _redirect("/tokens")

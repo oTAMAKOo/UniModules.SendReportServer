@@ -1,4 +1,7 @@
+import hashlib
 import logging
+import secrets
+from datetime import datetime, timedelta
 
 import bcrypt
 from itsdangerous import URLSafeTimedSerializer
@@ -6,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import AdminUser, SystemConfig
+from app.models import AdminUser, ApiToken, SystemConfig
 
 logger = logging.getLogger(__name__)
 
@@ -188,3 +191,50 @@ def ensure_admin_google_email(db: Session):
     except IntegrityError:
         # 複数ワーカーが同時に起動して同じ行を作ろうとした場合。もう一方が成功している
         db.rollback()
+
+
+# --- API トークン（読み取り API / MCP 用） ---
+
+# 平文トークンの接頭辞。ログやチャットに貼られたときに何のトークンか分かるようにする
+API_TOKEN_PREFIX = "blt_"
+# last_used_at の更新頻度（呼び出しごとに UPDATE すると MCP の連続呼び出しで書き込みが増えるため間引く）
+API_TOKEN_TOUCH_INTERVAL = timedelta(minutes=1)
+
+
+def hash_api_token(token: str) -> str:
+    """API トークンの保存用ハッシュ。トークン自体が十分に長いランダム値なので SHA-256 で足りる（bcrypt は不要）。"""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def generate_api_token() -> tuple[str, str, str]:
+    """新しい API トークンを生成し (平文, ハッシュ, 表示用プレフィックス) を返す。平文は呼び出し側で一度だけ表示する。"""
+    plain = API_TOKEN_PREFIX + secrets.token_urlsafe(32)
+    return plain, hash_api_token(plain), plain[:12]
+
+
+def extract_bearer_token(authorization: str | None) -> str | None:
+    """Authorization ヘッダから Bearer トークンを取り出す。形式が違えば None。"""
+    if not authorization:
+        return None
+    scheme, _, value = authorization.strip().partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+    value = value.strip()
+    return value or None
+
+
+def authenticate_api_token(db: Session, token: str | None) -> AdminUser | None:
+    """API トークンを検証し、紐づく有効なユーザーを返す。削除済み・期限切れ・無効ユーザーなら None。"""
+    if not token or not token.startswith(API_TOKEN_PREFIX):
+        return None
+    row = db.query(ApiToken).filter(ApiToken.token_hash == hash_api_token(token)).first()
+    if row is None or not row.is_usable:
+        return None
+    user = row.user
+    if user is None or not user.is_active:
+        return None
+    now = datetime.utcnow()
+    if row.last_used_at is None or now - row.last_used_at >= API_TOKEN_TOUCH_INTERVAL:
+        row.last_used_at = now
+        db.commit()
+    return user

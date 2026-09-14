@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # 招待リンクの有効期限（時間）
     invite_expire_hours: int = 72
 
+    # Claude Code 等から使う MCP サーバー（{URL_PREFIX}/mcp）を公開するか。
+    # 読み取り専用 API（{URL_PREFIX}/api/reports）は常に有効で、どちらも個人 API トークンが必要。
+    mcp_enabled: bool = True
+
     # 招待メールの送信方法: "none"（送信せず画面にリンク表示のみ） / "ses" / "smtp"
     mail_mode: str = "none"
     mail_from: str = ""

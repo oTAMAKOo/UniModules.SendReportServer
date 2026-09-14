@@ -59,7 +59,9 @@ async def receive_report(request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(report)
 
-    base_url = str(request.base_url).rstrip("/")
+    # nginx が TLS を終端するため request.base_url のスキームは http になる。公開 URL が
+    # 設定されていればそちらを使い、チャットで共有される URL が本番でも https になるようにする
+    base_url = settings.public_base_url or str(request.base_url).rstrip("/")
     url = f"{base_url}{settings.url_prefix}/detail/{report.id}"
 
     return ReportResponse(URL=url)

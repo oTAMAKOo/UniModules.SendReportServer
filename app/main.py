@@ -1,4 +1,4 @@
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -6,7 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import ensure_admin_google_email, ensure_default_admin
 from app.config import settings
 from app.database import SessionLocal
-from app.routers import api, admin, google_auth
+from app import mcp_server
+from app.routers import api, admin, google_auth, reports_api
 
 
 @asynccontextmanager
@@ -17,7 +18,11 @@ async def lifespan(app: FastAPI):
         ensure_admin_google_email(db)
     finally:
         db.close()
-    yield
+    async with AsyncExitStack() as stack:
+        if settings.mcp_enabled:
+            # マウントしたサブアプリの lifespan は動かないため、MCP のセッション管理をここで開始する
+            await stack.enter_async_context(mcp_server.session_lifespan())
+        yield
 
 
 app = FastAPI(title="Log Server", docs_url="/docs", redoc_url=None, lifespan=lifespan)
@@ -25,6 +30,12 @@ app = FastAPI(title="Log Server", docs_url="/docs", redoc_url=None, lifespan=lif
 app.include_router(api.router, prefix=settings.url_prefix)
 app.include_router(admin.router, prefix=settings.url_prefix)
 app.include_router(google_auth.router, prefix=settings.url_prefix)
+app.include_router(reports_api.router, prefix=settings.url_prefix)
+
+if settings.mcp_enabled:
+    # Claude Code 等の MCP クライアント向け（Streamable HTTP、API トークン認証）
+    # Mount ではなく Route にする（Mount は末尾スラッシュ無しを 307 で /mcp/ へ飛ばしてしまう）
+    app.add_route(f"{settings.url_prefix}/mcp", mcp_server.build_asgi_app(), name="mcp", include_in_schema=False)
 
 # Jinja2テンプレートにURLプレフィックスと Google ログインの有効状態をグローバル変数として渡す
 admin.templates.env.globals["PREFIX"] = settings.url_prefix

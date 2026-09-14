@@ -37,6 +37,10 @@
         <h5>パスワード変更</h5>
         <p>自分のパスワードを変更します</p>
     </a>
+    <a class="menu-card" href="{{ PREFIX }}/tokens">
+        <h5>API トークン</h5>
+        <p>Claude Code（MCP）や読み取り API からレポートを読むための個人トークン</p>
+    </a>
     {% if is_superuser %}
     <a class="menu-card" href="{{ PREFIX }}/manage">
         <h5>レポート管理</h5>

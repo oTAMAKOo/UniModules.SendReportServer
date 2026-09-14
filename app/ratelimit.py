@@ -47,3 +47,7 @@ login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 # Google 認証用（/auth/google, /auth/google/callback, /invite/*）: 1分間に20回まで。
 # パスワード総当たりとは性質が違う（Google の token エンドポイントへの発信を第三者に誘発されるのを抑える）ため別カウンタ
 oauth_limiter = RateLimiter(max_requests=20, window_seconds=60)
+
+# 読み取り API / MCP 用: 1分間に120回まで。Claude が調査中に検索とレポート取得を連続で呼ぶため
+# レポート受信より緩め。認証前に数えるので、トークン総当たりの抑止にもなる
+api_limiter = RateLimiter(max_requests=120, window_seconds=60)

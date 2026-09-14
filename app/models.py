@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Integer, String, Text, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -61,3 +61,32 @@ class AdminUser(Base):
             and self.password_hash is None
             and not self.is_active
         )
+
+
+class ApiToken(Base):
+    """読み取り API / MCP 用の個人トークン。
+
+    平文トークンは発行時に一度だけ表示し、DB には SHA-256 ハッシュのみ保存する。
+    失効は行の削除で行う（履歴は残さない）。ユーザー削除時は CASCADE で消える。
+    """
+
+    __tablename__ = "api_token"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("admin_user.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    token_prefix: Mapped[str] = mapped_column(String(12), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["AdminUser"] = relationship("AdminUser")
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_at is not None and self.expires_at <= datetime.utcnow()
+
+    @property
+    def is_usable(self) -> bool:
+        return not self.is_expired

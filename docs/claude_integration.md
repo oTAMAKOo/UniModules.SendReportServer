@@ -19,7 +19,7 @@
 
 ## 1. 仕組みの概要
 
-管理画面（`/buglog/detail/<id>` 等）はログイン必須で、セッション Cookie が無いとログイン画面へ
+管理画面（`/buglog/p/<slug>/detail/<id>` 等）はログイン必須で、セッション Cookie が無いとログイン画面へ
 リダイレクトされる。Claude Code の WebFetch は Cookie も Authorization ヘッダも送れないため、
 URL をそのまま渡しても中身は読めない。
 
@@ -31,6 +31,8 @@ URL をそのまま渡しても中身は読めない。
 | 読み取り専用 API | `/buglog/api/reports/...` | curl やスクリプトから JSON / Markdown で取得 |
 
 - トークンは**ユーザーごと**に発行し、そのユーザーの権限でレポートの**閲覧・検索だけ**ができる。削除や設定変更はできない
+- 見える範囲はそのユーザーが**所属するプロジェクト**に限られる。トークン 1 つで所属する全プロジェクトを読める。
+  検索は対象プロジェクトの `slug` を指定する（所属が 1 つだけなら省略可）。所属外のレポート ID は「存在しない」と同じ扱い（404）
 - トークンの平文は発行時に一度だけ表示され、DB にはハッシュしか保存されない。有効期限の設定ができ、削除すれば即座に使えなくなる
 - MCP サーバーは `.env` の `MCP_ENABLED=false` で無効化できる（読み取り API は常に有効）
 - `URL_PREFIX` を変えている場合は、以下の `/buglog` をその値に読み替える
@@ -124,16 +126,18 @@ connected になっていれば完了。失敗している場合は [9. トラ�
 Claude Code にレポートの URL を貼って依頼するだけでよい。
 
 ```
-https://<FQDN>/buglog/detail/123 このレポートの原因をざっくり調べて
+https://<FQDN>/buglog/p/<slug>/detail/123 このレポートの原因をざっくり調べて
 ```
 
 Claude は `get_report` にその URL を渡し、返ってきた Markdown（下記）を読んで調査を始める。
-ID だけ（`#123`）でも通る。
+ID だけ（`#123`）でも通る（レポート ID は全プロジェクトで通し番号）。
 
-より確実にしたい場合は、導入先プロジェクトの `CLAUDE.md` に一文足す。
+より確実にしたい場合は、導入先プロジェクトの `CLAUDE.md` に一文足す。所属プロジェクトが複数ある人は
+検索ツールに `project` を渡す必要があるので、そのプロジェクトの slug も書いておくとよい。
 
 ```markdown
-- `/buglog/detail/<id>` の URL が渡されたら、まず MCP ツール `get_report` にその URL を渡してレポート全文を取得し、それを元に調査する
+- `/buglog/p/<slug>/detail/<id>` の URL が渡されたら、まず MCP ツール `get_report` にその URL を渡してレポート全文を取得し、それを元に調査する
+- buglog のプロジェクト slug は `<slug>`。`search_reports` / `list_recent_reports` には `project="<slug>"` を渡す
 ```
 
 ### Claude が受け取る内容（Markdown）
@@ -144,14 +148,15 @@ ID だけ（`#123`）でも通る。
 ## 基本情報
 | 項目 | 値 |
 |---|---|
-| 投稿時間 | 2026-09-15 10:23:45 |
+| プロジェクト | My Game (my-game) |
+| 投稿時間 | 2026-09-15 10:23:45 (UTC) |
 | ユーザー | tester01 (u_0001) |
 | 端末 | iPhone15,2 |
 | BuildNumber | 1234 |
 | BranchName | develop |
 | ログ件数 | 87（エラー・例外 2 件） |
-| スクリーンショット | https://<bucket>.s3.ap-northeast-1.amazonaws.com/report/images/....png?X-Amz-Algorithm=...&X-Amz-Expires=1800&X-Amz-Signature=... |
-| 詳細ページ | https://<FQDN>/buglog/detail/123 |
+| スクリーンショット | https://<bucket>.s3.ap-northeast-1.amazonaws.com/report/my-game/images/....png?X-Amz-Algorithm=...&X-Amz-Expires=1800&X-Amz-Signature=... |
+| 詳細ページ | https://<FQDN>/buglog/p/my-game/detail/123 |
 
 ## エラー・例外の要約
 - [80] Exception: NullReferenceException: Object reference not set to an instance of an object
@@ -178,11 +183,12 @@ MCP の方が確実）。
 
 | ツール | 引数 | 内容 |
 |---|---|---|
-| `get_report` | `report`: URL / ID / `#ID` | レポート 1 件の全文を Markdown で返す |
-| `search_reports` | `query`, `date_from`, `date_to`, `limit`（既定 20、最大 50） | 全テキストフィールドの部分一致検索。同じ例外が他でも出ているか、特定ビルドの報告を探すとき |
-| `list_recent_reports` | `limit` | 最近の投稿を新しい順に要約 |
+| `list_projects` | なし | 所属プロジェクトの一覧（slug・表示名・役割・受信状態）。`project` に渡す slug を調べるとき |
+| `get_report` | `report`: URL / ID / `#ID` | レポート 1 件の全文を Markdown で返す。所属外のレポートは取得できない |
+| `search_reports` | `project`（slug。所属が 1 つなら省略可）, `query`, `date_from`, `date_to`, `limit`（既定 20、最大 50） | プロジェクト内を全テキストフィールドで部分一致検索。同じ例外が他でも出ているか、特定ビルドの報告を探すとき |
+| `list_recent_reports` | `project`（同上）, `limit` | プロジェクトの最近の投稿を新しい順に要約 |
 
-書き込み系のツールは提供しない。
+`project` を省略して所属が複数あると、所属 slug の一覧を含むエラー文が返る。書き込み系のツールは提供しない。
 
 ## 7. 読み取り API
 
@@ -191,17 +197,20 @@ MCP を使わずスクリプトから取得する場合。認証は `Authorizati
 
 | メソッド / パス | 内容 |
 |---|---|
+| `GET /buglog/api/projects` | 所属プロジェクトの一覧（`slug`, `name`, `role`, `is_active`） |
 | `GET /buglog/api/reports/<id>` | JSON。`?format=md` または `Accept: text/markdown` で Markdown |
 | `GET /buglog/api/reports/<id>.md` | Markdown |
-| `GET /buglog/api/reports?q=&date_from=&date_to=&page=&per_page=` | 検索（要約の一覧、新しい順。`per_page` は最大 100） |
+| `GET /buglog/api/reports?project=<slug>&q=&date_from=&date_to=&page=&per_page=` | プロジェクト内を検索（要約の一覧、新しい順。`per_page` は最大 100）。`project` は所属が 1 つなら省略可 |
 | `GET /buglog/api/resolve?ref=<URL か ID>` | URL からレポート ID を取り出す |
 
 ```bash
+curl -H "Authorization: Bearer $BUGLOG_TOKEN" https://<FQDN>/buglog/api/projects
 curl -H "Authorization: Bearer $BUGLOG_TOKEN" https://<FQDN>/buglog/api/reports/123.md
-curl -H "Authorization: Bearer $BUGLOG_TOKEN" "https://<FQDN>/buglog/api/reports?q=NullReference&per_page=5"
+curl -H "Authorization: Bearer $BUGLOG_TOKEN" "https://<FQDN>/buglog/api/reports?project=my-game&q=NullReference&per_page=5"
 ```
 
-認証失敗は `401`（`WWW-Authenticate: Bearer`）、存在しないレポートは `404`、レート制限超過は `429`。
+認証失敗は `401`（`WWW-Authenticate: Bearer`）、存在しない・所属外のレポートは `404`、`project` 未指定で所属が複数なら `400`（所属 slug の一覧付き）、
+所属外の `project` は `403`、存在しない `project` は `404`、レート制限超過は `429`。
 
 ## 8. 運用
 
@@ -212,7 +221,8 @@ curl -H "Authorization: Bearer $BUGLOG_TOKEN" "https://<FQDN>/buglog/api/reports
 - **MCP を止める**: `.env` に `MCP_ENABLED=false` を書いてコンテナを再作成する。`/buglog/mcp` が 404 になる。読み取り API は残る
 - **`.env` の `PUBLIC_BASE_URL`**: 設定しておくと、Markdown 内の詳細ページ URL と（local ストレージ時の）スクリーンショット URL が絶対 URL になる。未設定だとプレフィックスからの相対パスになり、Claude が画像を開けない
 - **スクリーンショット URL の期限**: S3 ストレージ時の画像 URL は署名付きで、`get_report` を呼んだ時点から `S3_PRESIGN_EXPIRE_SECONDS`（既定 1800 秒 = 30 分）で失効する。Markdown を保存しても画像リンクは後で切れる。再取得は `get_report` を呼び直す（詳細ページ URL やレポート ID には期限が無い）。期限内は URL を知る誰でも画像を開けるので、チャットやノートには画像 URL ではなく詳細ページ URL かレポート ID を貼る
-- **本番更新**: 依存パッケージ（`mcp`）が増えているため、更新時は必ず `up -d --build` でイメージを作り直す。マイグレーション 006（`api_token` テーブル）は起動時に自動適用される
+- **プロジェクトの追加**: 新しいプロジェクトを作っても、メンバーに追加された人のトークンはそのまま使える（トークンはユーザーに属し、見える範囲は所属で決まる）。Claude 側では `list_projects` で slug を確認するか、`CLAUDE.md` に slug を書く
+- **本番更新**: 依存パッケージ（`mcp`）が増えているため、更新時は必ず `up -d --build` でイメージを作り直す。マイグレーション（006 `api_token`、007 `project` / `project_member`）は起動時に自動適用される
 
 ## 9. トラブルシューティング
 
@@ -224,6 +234,8 @@ curl -H "Authorization: Bearer $BUGLOG_TOKEN" "https://<FQDN>/buglog/api/reports
 | MCP 接続時に 401 | トークンが削除済み・期限切れ、またはユーザーが無効化されている。「API トークン」ページで状態を確認し、必要なら再発行する |
 | MCP 接続時に 404 | サーバー側で `MCP_ENABLED=false`、または URL の `URL_PREFIX` が違う。管理画面の「API トークン」ページに表示される URL と比べる |
 | 429 が返る | 1 分 120 回の上限。同じ IP から複数人が使っている場合は上限に当たりやすい。少し待つ |
+| 検索ツールが「project を指定してください」と返す | 所属プロジェクトが 2 つ以上ある。エラー文にある slug を `project` に渡す。毎回言うのが面倒なら `CLAUDE.md` に slug を書く（5. を参照） |
+| `get_report` が「存在しないか、アクセス権がありません」 | レポートが削除されたか、そのプロジェクトに所属していない。`list_projects` で所属を確認し、必要ならプロジェクト管理者にメンバー追加を依頼する |
 | Claude が URL を貼っても WebFetch しようとする | `.mcp.json` が読まれていない（承認していない）か、ツールの存在に気づいていない。「`get_report` で読んで」と明示するか、`CLAUDE.md` に一文足す（5. を参照） |
 | Markdown 内のスクリーンショット URL が相対パス | `.env` の `PUBLIC_BASE_URL` が未設定。設定してコンテナを再作成する |
 | 画像 URL を開くと 403（`Request has expired`） | 署名付き URL の期限切れ（既定 30 分）。管理画面ならページを再読み込み、Claude なら `get_report` を呼び直して新しい URL を得る |

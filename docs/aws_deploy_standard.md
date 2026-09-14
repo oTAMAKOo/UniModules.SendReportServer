@@ -371,8 +371,10 @@ nano .env
 DATABASE_URL=postgresql://logserver:<DB_PASSWORD>@db:5432/logserver
 
 # AES Encryption
-REPORT_AES_KEY=<Unity側のAESキー（32文字）>
-REPORT_AES_IV=<Unity側のAES IV（16文字）>
+# 最初のプロジェクト（任意）。AES Key/IV はプロジェクトごとに DB で持ち、起動後に管理画面の
+# プロジェクト設定（/buglog/p/<slug>/settings）で Unity 側の鍵に合わせる
+INITIAL_PROJECT_SLUG=<プロジェクトの slug（小文字英数字とハイフン）>
+INITIAL_PROJECT_NAME=<表示名>
 
 # Storage mode
 STORAGE_MODE=s3
@@ -453,7 +455,8 @@ http://<SERVER_IP>/buglog/login
 
 ### 8-3. Unityクライアントからの送信テスト
 
-レポートURL: `http://<SERVER_IP>/buglog/report`
+先に管理画面のプロジェクト設定（`/buglog/p/<slug>/settings`）で AES Key/IV を Unity 側の鍵に合わせる。
+レポートURL: `http://<SERVER_IP>/buglog/report/<slug>`（鍵が一致しないと 400、slug が違うと 404）
 
 ---
 

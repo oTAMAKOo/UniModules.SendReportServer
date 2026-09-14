@@ -50,7 +50,7 @@ cp .env.example .env
 
 | キー | 内容 |
 |---|---|
-| `REPORT_AES_KEY` / `REPORT_AES_IV` | Unity クライアント側の `PLCryptoAES.KEY`（32文字）/ `PLCryptoAES.IV`（16文字）と一致させる。ここがズレるとレポートを復号できない |
+| `INITIAL_PROJECT_SLUG` / `INITIAL_PROJECT_NAME` | 初回起動（マイグレーション 007）で作られる最初のプロジェクトの slug と表示名（任意、既定 `default` / `Default`）。slug は受信 URL と管理画面 URL に使う |
 | `URL_PREFIX` | 管理画面・API の URL プレフィックス（既定 `/buglog`）。先頭の `/` は省略可、末尾の `/` は無視される。空にするとルート直下（`/login` 等）にマウントされる |
 | `SECRET_KEY` | セッション署名用。プロジェクト毎にランダム文字列を設定する |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 起動時に作られる初期管理者。初回ログイン後に変更する |
@@ -61,7 +61,9 @@ cp .env.example .env
 | `ADMIN_GOOGLE_EMAIL` | ロックアウト復旧用（任意）。起動のたびに管理者権限を保証する Google アカウント |
 | `MCP_ENABLED` | Claude Code 向け MCP サーバー（`/buglog/mcp`）を公開するか（既定 `true`） |
 
-AES Key/IV とセッション有効期限は、起動後に管理画面のシステム設定（`/buglog/system`）からも変更できる。
+AES Key/IV は**プロジェクトごと**に管理画面で設定する（システム管理者は `/buglog/admin/projects`、プロジェクト管理者は `/buglog/p/<slug>/settings`）。
+Unity クライアント側の `PLCryptoAES.KEY`（32文字）/ `PLCryptoAES.IV`（16文字）と一致させる。ズレていると受信が 400 になる。
+セッション有効期限は全体共通で、システム設定（`/buglog/system`）から変更できる。
 
 管理画面のログインは、ユーザー名 + パスワードに加えて **Google アカウント**でも行える（任意）。
 管理者が招待した Google アカウントだけがログインでき、Google ログインからユーザーが勝手に作られることはない。
@@ -93,6 +95,22 @@ AWS へのデプロイ手順は構成別に 3 種類ある。常時公開する�
 
 デプロイ先のドメイン・EC2 インスタンス ID・SSH 鍵のパスは**プロジェクト毎に異なる**ため、このリポジトリには持たせていない。導入先プロジェクト側（例: `.claude/commands/` の運用コマンド、CI の設定）で管理する。
 
+## 複数プロジェクトを 1 台で扱う
+
+1 つのサーバーで複数の Unity プロジェクトのレポートを受けられる。レポートは**プロジェクト**（URL 用の `slug` と表示名、AES Key/IV を持つ）に属し、
+ユーザーは所属するプロジェクトのレポートだけが見える。ユーザーアカウントは全体で 1 つで、プロジェクトごとの**所属と役割**で見える範囲が決まる。
+
+| 役割 | 判定 | できること |
+|---|---|---|
+| システム管理者 | ユーザーの「システム管理者」フラグ | プロジェクトの作成・削除（`/buglog/admin/projects`）、全ユーザー管理（`/buglog/admin/users`）、全プロジェクトの管理 |
+| プロジェクト管理者 | 所属の役割 = 管理者 | メンバーの追加・新規ユーザー作成・役割変更・除外、AES Key/IV の設定、期間指定の一括削除 |
+| メンバー | 所属の役割 = メンバー | レポートの閲覧・削除、Markdown コピー、自分の API トークン |
+
+- 受信 URL はプロジェクトごとに `POST /buglog/report/<slug>`。管理画面は `/buglog/p/<slug>/list` のようにプロジェクト配下に分かれる
+- ログイン後は所属プロジェクトが 1 つならその一覧へ、複数ならプロジェクト選択画面（`/buglog/projects`）へ進む。ナビバーで切り替えられる
+- プロジェクトの追加はシステム管理者が `/buglog/admin/projects` で行う（AES Key/IV はランダム生成されるので、Unity 側の鍵をそれに合わせるか、後からプロジェクト設定で書き換える）
+- 旧 URL（`/buglog/detail/<id>` など）は所属を確認したうえで新しい URL へ転送される
+
 ## Claude Code からレポートを読む
 
 管理画面はログイン必須のため、レポートの URL をそのまま Claude に渡しても中身は読めない。
@@ -102,8 +120,10 @@ AWS へのデプロイ手順は構成別に 3 種類ある。常時公開する�
 1. 管理画面 → 管理メニュー → **API トークン** でトークンを発行する（各エンジニアが自分の分を発行）
 2. 発行したトークンを環境変数 `BUGLOG_TOKEN` に設定する
 3. 導入先プロジェクトの `.mcp.json` に MCP サーバーを登録する（トークンは `${BUGLOG_TOKEN}` で参照し、ファイルには書かない）
-4. レポートの URL（`/buglog/detail/<id>`）を Claude Code に貼ると、`get_report` ツールでログ全文を読んで調査できる
+4. レポートの URL（`/buglog/p/<slug>/detail/<id>`）を Claude Code に貼ると、`get_report` ツールでログ全文を読んで調査できる
 
+トークン 1 つで所属する全プロジェクトのレポートを読める。検索（`search_reports` / `list_recent_reports`）は
+所属が 2 つ以上あるときプロジェクトの `slug` を指定する（1 つなら省略可。`list_projects` で確認できる）。
 設定手順・ツール一覧・トラブルシューティングは [docs/claude_integration.md](docs/claude_integration.md)。
 MCP サーバーは `.env` の `MCP_ENABLED=false` で無効化できる（読み取り API は常に有効）。
 
@@ -111,7 +131,8 @@ MCP サーバーは `.env` の `MCP_ENABLED=false` で無効化できる（読�
 
 送信側は Unity の `UniModules` リポジトリにある
 `Assets/UniModules/Scripts/Modules/Devkit/Diagnosis/SendReport/` が担当する。
-サーバーの受信エンドポイントは `POST /buglog/report`。
+サーバーの受信エンドポイントは `POST /buglog/report/<slug>`（`<slug>` は管理画面で作ったプロジェクトの識別子。
+プロジェクト設定画面に送信先 URL がそのまま表示される）。AES Key/IV はそのプロジェクトの設定と一致させる。
 
 ## 開発ルール
 

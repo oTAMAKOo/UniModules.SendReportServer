@@ -340,8 +340,10 @@ nano .env
 ```env
 DATABASE_URL=postgresql://logserver:<DB_PASSWORD>@db:5432/logserver
 
-REPORT_AES_KEY=<クライアントと一致する32文字>
-REPORT_AES_IV=<クライアントと一致する16文字>
+# 最初のプロジェクト（任意）。AES Key/IV はプロジェクトごとに DB で持ち、起動後に管理画面の
+# プロジェクト設定（/buglog/p/<slug>/settings）でクライアントの鍵に合わせる
+INITIAL_PROJECT_SLUG=<プロジェクトの slug（小文字英数字とハイフン）>
+INITIAL_PROJECT_NAME=<表示名>
 
 STORAGE_MODE=s3
 AWS_ACCESS_KEY_ID=<S3用アクセスキーID>
@@ -364,9 +366,9 @@ python3 -c "import secrets; print(secrets.token_urlsafe(48))"  # SECRET_KEY
 python3 -c "import secrets; print(secrets.token_urlsafe(24))"  # DB_PASSWORD
 ```
 
-> **AES キーを設定しないと静かに壊れる。** 送信は成功しレコードも作られるが、
-> 全フィールドが復号できず中身が空のまま保存される。手がかりは
-> `AES復号に失敗しました: key=Title` という警告ログだけ。
+> **AES キーはプロジェクトごと。** 初回起動で作られる最初のプロジェクトの鍵はランダムなので、
+> 起動後に管理画面のプロジェクト設定（`/buglog/p/<slug>/settings`）でクライアントの鍵に合わせる。
+> 一致しないとクライアントの送信は 400 になり、`AES復号に失敗しました: key=Title` の警告ログが出る。
 
 ### 7-3. 本番用 override の作成
 
@@ -959,10 +961,11 @@ sudo swapon --show
 プラグインのアーキテクチャ違い（`aarch64` を入れていないか）。
 6-3 を `linux-x86_64` でやり直す。
 
-### 管理画面に空のレポートが並ぶ
+### クライアントの送信が 400 になる / 管理画面に空のレポートが並ぶ
 
-AES キーの不一致。`.env` の `REPORT_AES_KEY` / `REPORT_AES_IV` を
-クライアント側と突き合わせる。
+AES キーの不一致（現行は 400 を返す。空のレポートが並ぶのは 007 より前の挙動）。
+管理画面のプロジェクト設定（`/buglog/p/<slug>/settings`）の AES Key/IV をクライアント側と突き合わせる。
+404 なら送信先 URL の slug が違うか、プロジェクトが受信停止になっている。
 
 ```bash
 docker compose logs app | grep AES

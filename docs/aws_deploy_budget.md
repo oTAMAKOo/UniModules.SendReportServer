@@ -172,7 +172,7 @@ aws s3api get-bucket-policy --bucket your-project-logserver
 
 署名付き URL の注意点:
 
-- 期限内なら URL を知る誰でも画像を開けます。チャットやメモには画像 URL ではなくレポートの詳細ページ URL（`/buglog/detail/<id>`）を貼ってください
+- 期限内なら URL を知る誰でも画像を開けます。チャットやメモには画像 URL ではなくレポートの詳細ページ URL（`/buglog/p/<slug>/detail/<id>`）を貼ってください
 - 管理画面を期限より長く開いたままにすると画像が表示されなくなります。ページを再読み込みすれば新しい URL で表示されます
 - 署名はサーバーの時計を使います。時刻が数分ずれると S3 が `RequestTimeTooSkewed` を返すので、インスタンスで時刻同期（chrony 等）が動いていることを確認してください
 
@@ -468,9 +468,10 @@ nano .env
 # Database
 DATABASE_URL=postgresql://logserver:<DB_PASSWORD>@db:5432/logserver
 
-# AES Encryption（Unityクライアント側のキーと一致させること）
-REPORT_AES_KEY=<Unity側のAESキー（32文字）>
-REPORT_AES_IV=<Unity側のAES IV（16文字）>
+# 最初のプロジェクト（任意）。AES Key/IV はプロジェクトごとに DB で持ち、起動後に管理画面の
+# プロジェクト設定（/buglog/p/<slug>/settings）で Unity 側の鍵に合わせる
+INITIAL_PROJECT_SLUG=<プロジェクトの slug（小文字英数字とハイフン）>
+INITIAL_PROJECT_NAME=<表示名>
 
 # Storage mode
 STORAGE_MODE=s3
@@ -578,12 +579,13 @@ http://<SERVER_IP>/buglog/login
 
 ### 8-3. Unityクライアントからの送信テスト
 
+先に管理画面のプロジェクト設定（`/buglog/p/<slug>/settings`）で AES Key/IV を Unity 側の鍵に合わせる。
 UnityクライアントのレポートURLを変更:
 ```
-http://<SERVER_IP>/buglog/report
+http://<SERVER_IP>/buglog/report/<slug>
 ```
 
-送信後、管理画面の一覧に表示されることを確認。
+送信後、管理画面の一覧に表示されることを確認。鍵が一致しないと 400、slug が違うと 404 が返る。
 
 ---
 

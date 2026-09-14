@@ -21,7 +21,7 @@ Google Workspace は不要で、普通の Google アカウント（gmail.com 等
 ## 1. 仕組みの概要
 
 - **Google ログインでユーザーが勝手に作られることはない。** ログインできるのは、管理者が
-  ユーザー管理画面（`/buglog/users`）で **email を登録した Google アカウントだけ**。
+  ユーザー管理画面（システム管理者は `/buglog/admin/users`、プロジェクト管理者は `/buglog/p/<slug>/users`）で **email を登録した Google アカウントだけ**。
 - 管理者が email を登録すると**招待リンク**が発行される。本人がリンクを開いてその Google
   アカウントでログインすると、アカウントが有効化され、以後は通常のログイン画面の
   「Google でログイン」から入れる。
@@ -99,7 +99,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d   # 本番
 
 ## 5. ユーザーを招待する
 
-管理者（superuser）で `/buglog/users` を開く。
+システム管理者は `/buglog/admin/users`、プロジェクト管理者は自分のプロジェクトの `/buglog/p/<slug>/users`（メンバー管理）を開く。
+プロジェクト管理者が作ったユーザーは、そのプロジェクトのメンバーとして自動で追加される。
 
 1. 「新規ユーザー追加」でユーザー名を入力し、**ログイン方法で「Google」を選ぶ**
 2. Email に本人の Google アカウントのアドレスを入力して「追加」
@@ -124,7 +125,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d   # 本番
 
 | やりたいこと | 誰が | どこで |
 |---|---|---|
-| パスワードユーザーに **Google ログインを追加** | 管理者 | `/buglog/users` の操作列 **「Google連携」** → email を入力して「招待」 |
+| パスワードユーザーに **Google ログインを追加** | システム管理者 | `/buglog/admin/users` の操作列 **「Google連携」** → email を入力して「招待」 |
 | Google 専用ユーザーに **パスワードを追加** | **本人**（または管理者が操作列の「PW設定」） | ログイン後、管理メニュー →「パスワード変更」（Google 専用ユーザーには **「パスワード設定」** 画面として開き、現在のパスワードは求められない） |
 | Google 連携を **解除** | 管理者 | 「Google連携」→「解除」（パスワードを持たないユーザーは解除できない） |
 | Google アカウントを **別のアドレスに変更** | 管理者 | 「Google連携」→ アドレスを書き換えて「変更」（旧連携は解除され、新アドレスの持ち主が連携し直す） |

@@ -50,9 +50,9 @@ cp .env.example .env
 # Database
 DATABASE_URL=postgresql://logserver:logserver@db:5432/logserver
 
-# AES Encryption（Unityクライアントと一致させること）
-REPORT_AES_KEY=0123456789abcdef
-REPORT_AES_IV=abcdef0123456789
+# 最初のプロジェクト（任意）。AES Key/IV は起動後に管理画面のプロジェクト設定で確認・変更する
+# INITIAL_PROJECT_SLUG=default
+# INITIAL_PROJECT_NAME=Default
 
 # Storage mode: "local" or "s3"
 # local は /storage/ 配下を nginx が認証なしで直接配信する（開発用途。画像を保護しない）。
@@ -74,8 +74,10 @@ ADMIN_PASSWORD=password
 SECRET_KEY=change-this-to-a-random-string
 ```
 
-> **AES Key/IV について**: 本番のUnityクライアントと通信する場合は、クライアント側の `PLCryptoAES.KEY`（32文字）と `PLCryptoAES.IV`（16文字）に合わせてください。
-> AES Key/IV はシステム設定画面（/buglog/system）からもDB経由で変更可能です。
+> **AES Key/IV について**: AES Key/IV は**プロジェクトごと**に DB で管理します。初回起動時に最初のプロジェクト（既定 `default`）が
+> ランダムな鍵で作られるので、Unity クライアントと通信する場合は管理画面のプロジェクト設定（`/buglog/p/default/settings`）で
+> クライアント側の `PLCryptoAES.KEY`（32文字）と `PLCryptoAES.IV`（16文字）に合わせてください。
+> 受信 URL は `POST /buglog/report/<slug>` で、鍵が一致しないと 400 が返ります。
 
 ### Step 3: Docker Compose でビルド & 起動
 
@@ -165,12 +167,17 @@ docker compose ps で確認できるサービス:
 |-----|------|
 | `http://127.0.0.1/` | API ヘルスチェック |
 | `http://127.0.0.1/buglog/login` | ログイン画面 |
-| `http://127.0.0.1/buglog/list` | レポート一覧 |
-| `http://127.0.0.1/buglog/detail/{id}` | レポート詳細 |
+| `http://127.0.0.1/buglog/projects` | プロジェクト選択（所属が 1 つならログイン後は一覧へ直行） |
+| `http://127.0.0.1/buglog/p/{slug}/list` | レポート一覧（プロジェクト単位） |
+| `http://127.0.0.1/buglog/p/{slug}/detail/{id}` | レポート詳細 |
+| `http://127.0.0.1/buglog/p/{slug}/users` | メンバー管理（プロジェクト管理者） |
+| `http://127.0.0.1/buglog/p/{slug}/settings` | プロジェクト設定（AES Key/IV、受信 URL） |
+| `http://127.0.0.1/buglog/p/{slug}/manage` | レポート管理（一括削除） |
 | `http://127.0.0.1/buglog/admin` | 管理メニュー |
-| `http://127.0.0.1/buglog/system` | システム設定（AES Key/IV、セッション有効期限） |
-| `http://127.0.0.1/buglog/users` | ユーザー管理 |
-| `http://127.0.0.1/buglog/manage` | レポート管理（一括削除） |
+| `http://127.0.0.1/buglog/admin/projects` | プロジェクト管理（システム管理者） |
+| `http://127.0.0.1/buglog/admin/users` | 全ユーザー管理（システム管理者） |
+| `http://127.0.0.1/buglog/system` | システム設定（セッション有効期限） |
+| `http://127.0.0.1/buglog/tokens` | API トークン |
 | `http://127.0.0.1/docs` | FastAPI Swagger UI |
 
 ---
@@ -257,17 +264,23 @@ UniModules.SendReportServer/
 │   ├── main.py             # FastAPIアプリケーション エントリーポイント
 │   ├── config.py           # 設定（pydantic-settings、.envから読み込み）
 │   ├── database.py         # SQLAlchemy エンジン & セッション
-│   ├── models.py           # DBモデル（ReportData, AdminUser, SystemConfig）
+│   ├── models.py           # DBモデル（Project, ProjectMember, ReportData, AdminUser, SystemConfig, ApiToken）
 │   ├── schemas.py          # Pydantic スキーマ
-│   ├── auth.py             # 認証（bcryptハッシュ、セッショントークン）
-│   ├── crypto.py           # AES-256-CBC 復号処理
+│   ├── auth.py             # 認証（bcryptハッシュ、セッショントークン、API トークン）
+│   ├── authz.py            # 認可（プロジェクトの所属と役割、ログイン必須の依存関数）
+│   ├── templating.py       # Jinja2 環境（全ルーター共通、ナビ用 context processor）
+│   ├── crypto.py           # AES-256-CBC 復号処理（鍵はプロジェクトごと）
 │   ├── storage.py          # 画像保存（ローカル / S3 対応）
 │   ├── ratelimit.py        # IP ごとのレート制限（ログイン / Google 認証 / レポート受信）
 │   ├── google_auth.py      # Google OAuth（認可 URL、code 交換、ID トークン検証）
 │   ├── mail.py             # 招待メール送信（none / SES / SMTP）
 │   ├── routers/
-│   │   ├── api.py          # クライアント向けAPI（レポート受信）
-│   │   └── admin.py        # 管理画面（ログイン、一覧、詳細、ユーザー管理等）
+│   │   ├── api.py          # クライアント向けAPI（レポート受信 POST /report/{slug}）
+│   │   ├── admin.py        # 管理画面の共通部分（ログイン、プロジェクト選択、管理メニュー、トークン）
+│   │   ├── project_pages.py # プロジェクト配下 /p/{slug}/（一覧、詳細、一括削除、メンバー管理、AES 設定）
+│   │   ├── system_admin.py # システム管理者専用（プロジェクト管理、全ユーザー管理、システム設定）
+│   │   ├── reports_api.py  # 読み取り専用 API（Claude Code 等）
+│   │   └── common.py       # ルーター共通ヘルパー
 │   ├── templates/          # Jinja2 HTMLテンプレート
 │   │   ├── base.html       # ベーステンプレート（ダーク/ライトテーマ）
 │   │   ├── login.html
@@ -317,30 +330,49 @@ UniModules.SendReportServer/
 | created_at | DateTime | 作成日時 |
 | last_login_at | DateTime | 最終ログイン日時 |
 
+### Project（プロジェクト）
+| カラム | 型 | 説明 |
+|--------|-----|------|
+| id | Integer | 主キー |
+| slug | String(40) | URL 用の識別子（一意。小文字英数字とハイフン） |
+| name | String(100) | 表示名 |
+| aes_key / aes_iv | String(32) / String(16) | このプロジェクトの受信を復号する AES Key / IV |
+| is_active | Boolean | False にすると受信 URL が 404 を返す（閲覧は可） |
+
+### ProjectMember（所属）
+| カラム | 型 | 説明 |
+|--------|-----|------|
+| project_id / user_id | Integer | プロジェクトとユーザー（組で一意） |
+| role | String(16) | `admin`（プロジェクト管理者）/ `member` |
+
 ### SystemConfig（システム設定）
 | キー | 説明 | デフォルト |
 |------|------|-----------|
-| aes_key | AES暗号化キー（32文字） | .envの値 |
-| aes_iv | AES初期化ベクトル（16文字） | .envの値 |
 | session_hours | セッション有効期限（時間） | 24 |
 
 ---
 
 ## 管理画面の機能一覧
 
-- **レポート一覧**: 全文検索（ILIKE）、日付フィルタ、25件/ページのページング
-- **レポート詳細**: ログ表示（Unityコンソール風）、スクリーンショットライトボックス、削除
-- **レポート管理**: 期間指定での一括削除
+- **プロジェクト選択**: ログイン後、所属が複数ならプロジェクトを選ぶ（1 つなら一覧へ直行）。ナビバーで切替
+- **レポート一覧**（プロジェクト単位）: 全文検索（ILIKE）、日付フィルタ、25件/ページのページング
+- **レポート詳細**: ログ表示（Unityコンソール風）、スクリーンショットライトボックス、Markdown コピー、削除
+- **レポート管理**: 期間指定での一括削除（プロジェクト管理者）
+- **メンバー管理**: 既存ユーザーの追加、新規ユーザー作成（パスワード / Google 招待）、役割変更、除外（プロジェクト管理者）
+- **プロジェクト設定**: AES Key/IV、受信 URL の表示（プロジェクト管理者）
 - **パスワード変更**: 自分のパスワードを変更
-- **ユーザー管理**: ユーザーCRUD、権限変更、有効/無効切替、PW変更（スーパーユーザーのみ）
-- **システム設定**: AES Key/IV、セッション有効期限（スーパーユーザーのみ）
+- **API トークン**: Claude Code（MCP）/ 読み取り API 用の個人トークン
+- **プロジェクト管理**: プロジェクトの作成・表示名や slug の変更・受信停止・削除（システム管理者）
+- **全ユーザー管理**: アカウントの作成・削除、有効/無効、システム管理者権限、PW変更、Google 連携（システム管理者）
+- **システム設定**: セッション有効期限（システム管理者）
 - **テーマ切替**: ダーク/ライトモード（localStorageに保存）
 
 ### セキュリティ機能
 - bcryptパスワードハッシュ
 - itsdangerousセッショントークン（有効期限はDB設定で変更可能）
-- 管理者0人時の緊急アカウント自動作成
-- 最後の管理者の権限解除防止
+- プロジェクトの所属と役割による認可（所属外のレポートは存在しないものとして 404）
+- システム管理者0人時の緊急アカウント自動作成
+- 最後のシステム管理者の権限解除防止、最後のプロジェクト管理者の降格・除外防止（システム管理者は例外）
 
 ---
 

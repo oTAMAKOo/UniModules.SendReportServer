@@ -188,19 +188,18 @@
 {% endblock %}
 {% block content %}
 <div class="page-header" style="justify-content: space-between;">
-    <div style="display:flex; align-items:center; gap:12px;">
-        <a class="page-header-back" href="{{ PREFIX }}/list">&laquo; レポート一覧</a>
+    <a class="page-header-back" href="{{ PREFIX }}/list">&laquo; レポート一覧</a>
+    <div style="display:flex; align-items:center; gap:8px;">
         <button type="button" class="copy-btn" style="margin:0;" data-md-url="{{ PREFIX }}/api/reports/{{ report.id }}.md"
                 onclick="copyMarkdown(this)" title="Claude に貼り付けられる Markdown 形式でレポート全文をコピー">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             <span class="copy-label">Markdown をコピー</span>
         </button>
-        <a class="page-header-back" href="{{ PREFIX }}/api/reports/{{ report.id }}.md" target="_blank" rel="noopener" style="font-size:12px;">Markdown を開く</a>
+        <form method="post" action="{{ PREFIX }}/delete/{{ report.id }}" onsubmit="return confirm('このレポートを削除しますか？')" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
+        </form>
     </div>
-    <form method="post" action="{{ PREFIX }}/delete/{{ report.id }}" onsubmit="return confirm('このレポートを削除しますか？')">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
-    </form>
 </div>
 <div class="detail-well">
     <div>

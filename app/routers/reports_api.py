@@ -25,7 +25,7 @@ from app.report_export import (
     report_to_markdown,
     search_reports_query,
 )
-from app.routers.admin import _get_current_user
+from app.routers.common import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def get_api_user(request: Request, db: Session = Depends(get_db)) -> AdminUser:
         # Bearer 以外のスキームや空のトークン
         raise _unauthorized()
 
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if user is None:
         raise _unauthorized()
     return user

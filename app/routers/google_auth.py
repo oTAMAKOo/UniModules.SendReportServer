@@ -31,7 +31,8 @@ from app.config import settings
 from app.database import get_db
 from app.models import AdminUser
 from app.ratelimit import oauth_limiter
-from app.routers.admin import _redirect, templates
+from app.routers.common import redirect
+from app.templating import templates
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ async def invite_accept(token: str, request: Request, db: Session = Depends(get_
 
     if user.google_sub is not None:
         # 既に連携済み。通常のログインへ
-        return _redirect("/login")
+        return redirect("/login")
 
     return _start_google_auth(invite_email=user.email)
 
@@ -175,7 +176,7 @@ async def google_callback(
     db.commit()
     logger.info("Google ログイン成功: user=%s", user.username)
 
-    response = _redirect("/list")
+    response = redirect("/list")
     response.set_cookie(
         SESSION_COOKIE,
         create_session_token(user.username),

@@ -1,80 +1,46 @@
 import json
 import math
-import re
 from datetime import datetime, timedelta
-import secrets
-import string
 
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
-from starlette.concurrency import run_in_threadpool
 
 from app.auth import (
     check_credentials,
     cookie_secure,
-    create_invite_token,
     generate_api_token,
     create_session_token,
-    generate_csrf_token,
     get_session_max_age,
     hash_password,
     normalize_email,
-    verify_csrf_token,
     verify_password,
-    verify_session_token,
     SESSION_COOKIE,
 )
 from app.config import settings
 from app.database import get_db
-from app.mail import MailError, mail_enabled, send_invite_mail
-from app.models import AdminUser, ApiToken, ReportData, SystemConfig
+from app.models import AdminUser, ApiToken, ReportData
 from app.ratelimit import login_limiter
 from app.report_export import format_log
+from app.routers.common import (
+    check_and_create_emergency_admin,
+    csrf_token_for,
+    get_config_value,
+    get_current_user,
+    is_last_active_superuser,
+    is_valid_email,
+    issue_invite,
+    redirect,
+    set_config_value,
+    verify_csrf,
+)
 from app.storage import delete_screenshot, get_image_url
+from app.templating import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 ITEMS_PER_PAGE = 25
-
-
-def _redirect(path: str, status_code: int = 302) -> RedirectResponse:
-    """プレフィックス付きリダイレクトを生成するヘルパー。
-
-    プレフィックスは settings.url_prefix（テンプレートにはJinja2グローバル変数
-    PREFIX として渡される）。
-    """
-    return RedirectResponse(url=f"{settings.url_prefix}{path}", status_code=status_code)
-
-
-def _get_current_user(request: Request, db: Session) -> AdminUser | None:
-    token = request.cookies.get(SESSION_COOKIE)
-    if not token:
-        return None
-    max_age = get_session_max_age(db)
-    username = verify_session_token(token, max_age=max_age)
-    if not username:
-        return None
-    return db.query(AdminUser).filter(
-        AdminUser.username == username,
-        AdminUser.is_active == True,
-    ).first()
-
-
-def _csrf_token_for(user: AdminUser) -> str:
-    """ユーザーに紐づくCSRFトークンを生成する。"""
-    return generate_csrf_token(user.username)
-
-
-def _verify_csrf(request_token: str | None, user: AdminUser) -> bool:
-    """CSRFトークンを検証する。"""
-    if not request_token:
-        return False
-    username = verify_csrf_token(request_token)
-    return username == user.username
 
 
 # ログの整形は MCP / API と共通化したため app/report_export.py にある
@@ -82,32 +48,6 @@ _format_log = format_log
 
 
 # --- Login / Logout ---
-
-
-def _check_and_create_emergency_admin(db: Session) -> dict | None:
-    """アクティブな管理者が0人の場合、緊急管理者を自動作成して認証情報を返す。"""
-    active_superuser_count = db.query(AdminUser).filter(
-        AdminUser.is_superuser == True,
-        AdminUser.is_active == True,
-    ).count()
-    if active_superuser_count > 0:
-        return None
-    alphabet = string.ascii_letters + string.digits
-    password = "".join(secrets.choice(alphabet) for _ in range(12))
-    username = "emergency_admin"
-    existing = db.query(AdminUser).filter(AdminUser.username == username).first()
-    if existing:
-        existing.password_hash = hash_password(password)
-        existing.is_superuser = True
-        existing.is_active = True
-    else:
-        db.add(AdminUser(
-            username=username,
-            password_hash=hash_password(password),
-            is_superuser=True,
-        ))
-    db.commit()
-    return {"username": username, "password": password}
 
 
 def _users_page(request: Request, user: AdminUser, db: Session, **context):
@@ -119,59 +59,15 @@ def _users_page(request: Request, user: AdminUser, db: Session, **context):
     users = db.query(AdminUser).order_by(AdminUser.id).all()
     return templates.TemplateResponse(
         "user_list.html",
-        {"request": request, "user": user.username, "users": users, "csrf_token": _csrf_token_for(user), **context},
+        {"request": request, "user": user.username, "users": users, "csrf_token": csrf_token_for(user), **context},
     )
-
-
-def _is_last_active_superuser(db: Session, target: AdminUser) -> bool:
-    """target を降格・無効化・削除すると有効な管理者が 0 人になるか。"""
-    if not (target.is_superuser and target.is_active):
-        return False
-    count = db.query(AdminUser).filter(
-        AdminUser.is_superuser == True,
-        AdminUser.is_active == True,
-    ).count()
-    return count <= 1
-
-
-_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-def _is_valid_email(email: str) -> bool:
-    return bool(_EMAIL_PATTERN.match(email)) and len(email) <= 255
-
-
-async def _issue_invite(target: AdminUser, note: str | None = None) -> dict:
-    """招待リンクを発行し、MAIL_MODE に応じてメールを送る。画面表示用の情報を返す。
-
-    メール送信（SMTP / SES）は同期 I/O なので、イベントループを塞いでレポート受信まで
-    止めないようスレッドプールで実行する。
-    """
-    token = create_invite_token(target)
-    url = f"{settings.public_base_url}{settings.url_prefix}/invite/{token}"
-    result = {
-        "username": target.username,
-        "email": target.email,
-        "url": url,
-        "expire_hours": settings.invite_expire_hours,
-        "mail_sent": False,
-        "mail_error": None,
-        "note": note,
-    }
-    if mail_enabled():
-        try:
-            await run_in_threadpool(send_invite_mail, target.email, target.username, url)
-            result["mail_sent"] = True
-        except MailError as e:
-            result["mail_error"] = str(e)
-    return result
 
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, db: Session = Depends(get_db)):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if user:
-        return _redirect("/list")
+        return redirect("/list")
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 
@@ -194,14 +90,14 @@ async def login_submit(
 
     token = create_session_token(admin_user.username)
     max_age = get_session_max_age(db)
-    response = _redirect("/list")
+    response = redirect("/list")
     response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=cookie_secure(), max_age=max_age)
     return response
 
 
 @router.get("/logout")
 async def logout():
-    response = _redirect("/login")
+    response = redirect("/login")
     response.delete_cookie(SESSION_COOKIE)
     return response
 
@@ -211,9 +107,9 @@ async def logout():
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_menu(request: Request, db: Session = Depends(get_db)):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
     return templates.TemplateResponse(
         "admin_menu.html",
         {"request": request, "user": user.username, "is_superuser": user.is_superuser},
@@ -225,9 +121,9 @@ async def admin_menu(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/password_change", response_class=HTMLResponse)
 async def password_change_page(request: Request, db: Session = Depends(get_db)):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
     return _password_change_page(request, user)
 
 
@@ -242,7 +138,7 @@ def _password_change_page(request: Request, user: AdminUser, message: str | None
         {
             "request": request,
             "user": user.username,
-            "csrf_token": _csrf_token_for(user),
+            "csrf_token": csrf_token_for(user),
             "has_password": user.has_password,
             "message": message,
             "error": error,
@@ -258,12 +154,12 @@ async def password_change_submit(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     # パスワード未設定（Google 専用）のユーザーは現在のパスワード無しで設定できる。
     # セッションが Google 認証で確立済みであることが本人確認の代わりになる。
@@ -284,9 +180,9 @@ async def password_change_submit(
 
 @router.get("/users", response_class=HTMLResponse)
 async def user_list(request: Request, db: Session = Depends(get_db)):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
     return _users_page(request, user, db)
 
@@ -308,12 +204,12 @@ async def user_create(
     "google" なら email だけを持つ招待中ユーザー（is_active=False）を作り、
     招待リンクを発行する。本人がリンクからその Google アカウントでログインすると有効化される。
     """
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     username = username.strip()
     if len(username) < 1 or len(username) > 64:
@@ -328,7 +224,7 @@ async def user_create(
             return _users_page(request, user, db, error="Google ログインが設定されていないため、Google ユーザーは作成できません（.env の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL）")
 
         email = normalize_email(email)
-        if not email or not _is_valid_email(email):
+        if not email or not is_valid_email(email):
             return _users_page(request, user, db, error="メールアドレスの形式が正しくありません")
 
         if db.query(AdminUser).filter(AdminUser.email == email).first():
@@ -343,7 +239,7 @@ async def user_create(
         )
         db.add(new_user)
         db.commit()
-        return _users_page(request, user, db, invite=await _issue_invite(new_user))
+        return _users_page(request, user, db, invite=await issue_invite(new_user))
 
     if login_method != "password":
         return _users_page(request, user, db, error="ログイン方法が不正です")
@@ -362,7 +258,7 @@ async def user_create(
     )
     db.add(new_user)
     db.commit()
-    return _redirect("/users")
+    return redirect("/users")
 
 
 @router.post("/users/delete/{user_id}")
@@ -372,23 +268,23 @@ async def user_delete(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if target and target.id != user.id:
-        if _is_last_active_superuser(db, target):
+        if is_last_active_superuser(db, target):
             return _users_page(request, user, db, error="最後の有効な管理者は削除できません")
         db.delete(target)
         db.commit()
-        emergency = _check_and_create_emergency_admin(db)
+        emergency = check_and_create_emergency_admin(db)
         if emergency:
             return _users_page(request, user, db, emergency=emergency)
-    return _redirect("/users")
+    return redirect("/users")
 
 
 @router.post("/users/toggle/{user_id}")
@@ -398,23 +294,23 @@ async def user_toggle_active(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if target and target.id != user.id:
-        if target.is_active and _is_last_active_superuser(db, target):
+        if target.is_active and is_last_active_superuser(db, target):
             return _users_page(request, user, db, error="最後の有効な管理者は無効化できません")
         target.is_active = not target.is_active
         db.commit()
-        emergency = _check_and_create_emergency_admin(db)
+        emergency = check_and_create_emergency_admin(db)
         if emergency:
             return _users_page(request, user, db, emergency=emergency)
-    return _redirect("/users")
+    return redirect("/users")
 
 
 @router.post("/users/toggle_superuser/{user_id}")
@@ -424,23 +320,23 @@ async def user_toggle_superuser(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if target and target.id != user.id:
-        if target.is_superuser and _is_last_active_superuser(db, target):
+        if target.is_superuser and is_last_active_superuser(db, target):
             return _users_page(request, user, db, error="最後の有効な管理者の権限は解除できません")
         target.is_superuser = not target.is_superuser
         db.commit()
-        emergency = _check_and_create_emergency_admin(db)
+        emergency = check_and_create_emergency_admin(db)
         if emergency:
             return _users_page(request, user, db, emergency=emergency)
-    return _redirect("/users")
+    return redirect("/users")
 
 
 @router.post("/users/reset_password/{user_id}")
@@ -451,12 +347,12 @@ async def user_reset_password(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     if len(new_password) < 4:
         return _users_page(request, user, db, error="パスワードは4文字以上で入力してください")
@@ -465,7 +361,7 @@ async def user_reset_password(
     if target:
         target.password_hash = hash_password(new_password)
         db.commit()
-    return _redirect("/users")
+    return redirect("/users")
 
 
 @router.post("/users/set_email/{user_id}", response_class=HTMLResponse)
@@ -487,16 +383,16 @@ async def user_set_email(
       連携済みで無効なユーザーは先に有効化してもらう
     - パスワードを持たない最後の有効な管理者のアドレス変更は、誰も入れなくなるため拒否
     """
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if not target:
-        return _redirect("/users")
+        return redirect("/users")
 
     email = normalize_email(email)
     if email is None:
@@ -505,12 +401,12 @@ async def user_set_email(
         target.email = None
         target.google_sub = None
         db.commit()
-        return _redirect("/users")
+        return redirect("/users")
 
     if not settings.google_enabled:
         return _users_page(request, user, db, error="Google ログインが設定されていないため、Google 連携は設定できません（.env の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL）")
 
-    if not _is_valid_email(email):
+    if not is_valid_email(email):
         return _users_page(request, user, db, error="メールアドレスの形式が正しくありません")
 
     if not target.is_active and target.google_sub is not None:
@@ -519,15 +415,15 @@ async def user_set_email(
     if email == target.email:
         if target.google_sub is None:
             # 未連携で変更なし。リンクの再送は「招待リンク再発行」で行う
-            return _redirect("/users")
+            return redirect("/users")
         target.google_sub = None
         db.commit()
-        return _users_page(request, user, db, invite=await _issue_invite(
+        return _users_page(request, user, db, invite=await issue_invite(
             target,
             note="既存の Google 連携を解除しました。本人がこのアドレスの Google アカウントでログインし直すと再連携されます",
         ))
 
-    if not target.has_password and _is_last_active_superuser(db, target):
+    if not target.has_password and is_last_active_superuser(db, target):
         return _users_page(request, user, db, error=f"'{target.username}' は最後の有効な管理者でパスワードを持たないため、Google アカウントを変更するとログインできなくなります。先にパスワードを設定してください")
 
     duplicate = db.query(AdminUser).filter(AdminUser.email == email, AdminUser.id != target.id).first()
@@ -538,7 +434,7 @@ async def user_set_email(
     # 別アドレスの持ち主が連携し直せるよう、既存の Google 連携は解除する
     target.google_sub = None
     db.commit()
-    return _users_page(request, user, db, invite=await _issue_invite(target))
+    return _users_page(request, user, db, invite=await issue_invite(target))
 
 
 @router.post("/users/reinvite/{user_id}", response_class=HTMLResponse)
@@ -549,52 +445,39 @@ async def user_reinvite(
     db: Session = Depends(get_db),
 ):
     """招待リンクを再発行する（有効期限切れ・メール不達時用）。"""
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if not target or not target.has_google or target.google_sub is not None:
-        return _redirect("/users")
+        return redirect("/users")
 
     if not settings.google_enabled:
         return _users_page(request, user, db, error="Google ログインが設定されていないため、招待リンクは発行できません")
 
-    return _users_page(request, user, db, invite=await _issue_invite(target))
+    return _users_page(request, user, db, invite=await issue_invite(target))
 
 
 # --- System Config ---
 
 
-def _get_config_value(db: Session, key: str, default: str) -> str:
-    row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
-    return row.value if row and row.value else default
-
-
-def _set_config_value(db: Session, key: str, value: str):
-    row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
-    if row:
-        row.value = value
-    else:
-        db.add(SystemConfig(key=key, value=value))
-
-
 @router.get("/system", response_class=HTMLResponse)
 async def system_config_page(request: Request, db: Session = Depends(get_db)):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    aes_key = _get_config_value(db, "aes_key", settings.report_aes_key)
-    aes_iv = _get_config_value(db, "aes_iv", settings.report_aes_iv)
-    session_hours = _get_config_value(db, "session_hours", "24")
+    aes_key = get_config_value(db, "aes_key", settings.report_aes_key)
+    aes_iv = get_config_value(db, "aes_iv", settings.report_aes_iv)
+    session_hours = get_config_value(db, "session_hours", "24")
 
     return templates.TemplateResponse(
         "system_config.html",
-        {"request": request, "user": user.username, "aes_key": aes_key, "aes_iv": aes_iv, "session_hours": session_hours, "csrf_token": _csrf_token_for(user), "message": None, "error": None},
+        {"request": request, "user": user.username, "aes_key": aes_key, "aes_iv": aes_iv, "session_hours": session_hours, "csrf_token": csrf_token_for(user), "message": None, "error": None},
     )
 
 
@@ -607,14 +490,14 @@ async def system_config_submit(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user or not user.is_superuser:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
-    tpl_vars = {"request": request, "user": user.username, "aes_key": aes_key, "aes_iv": aes_iv, "session_hours": session_hours, "csrf_token": _csrf_token_for(user), "message": None, "error": None}
+    tpl_vars = {"request": request, "user": user.username, "aes_key": aes_key, "aes_iv": aes_iv, "session_hours": session_hours, "csrf_token": csrf_token_for(user), "message": None, "error": None}
 
     if len(aes_key.encode("utf-8")) != 32:
         tpl_vars["error"] = "AES Keyは32文字で指定してください"
@@ -631,9 +514,9 @@ async def system_config_submit(
         tpl_vars["error"] = "セッション有効期限は1〜8760（時間）の整数で入力してください"
         return templates.TemplateResponse("system_config.html", tpl_vars)
 
-    _set_config_value(db, "aes_key", aes_key)
-    _set_config_value(db, "aes_iv", aes_iv)
-    _set_config_value(db, "session_hours", str(hours))
+    set_config_value(db, "aes_key", aes_key)
+    set_config_value(db, "aes_iv", aes_iv)
+    set_config_value(db, "session_hours", str(hours))
     db.commit()
 
     tpl_vars["session_hours"] = str(hours)
@@ -646,16 +529,16 @@ async def system_config_submit(
 
 @router.get("/manage", response_class=HTMLResponse)
 async def report_manage_page(request: Request, db: Session = Depends(get_db)):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
     if not user.is_superuser:
-        return _redirect("/admin")
+        return redirect("/admin")
 
     total_count = db.query(func.count(ReportData.id)).scalar()
     return templates.TemplateResponse(
         "report_manage.html",
-        {"request": request, "user": user.username, "total_count": total_count, "csrf_token": _csrf_token_for(user), "message": None, "error": None},
+        {"request": request, "user": user.username, "total_count": total_count, "csrf_token": csrf_token_for(user), "message": None, "error": None},
     )
 
 
@@ -667,14 +550,14 @@ async def report_bulk_delete(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
     if not user.is_superuser:
-        return _redirect("/admin")
+        return redirect("/admin")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     from datetime import datetime, timedelta
 
@@ -684,7 +567,7 @@ async def report_bulk_delete(
         total_count = db.query(func.count(ReportData.id)).scalar()
         return templates.TemplateResponse(
             "report_manage.html",
-            {"request": request, "user": user.username, "total_count": total_count, "csrf_token": _csrf_token_for(user), "message": None, "error": "日付を指定してください"},
+            {"request": request, "user": user.username, "total_count": total_count, "csrf_token": csrf_token_for(user), "message": None, "error": "日付を指定してください"},
         )
 
     if date_from:
@@ -712,7 +595,7 @@ async def report_bulk_delete(
     total_count = db.query(func.count(ReportData.id)).scalar()
     return templates.TemplateResponse(
         "report_manage.html",
-        {"request": request, "user": user.username, "total_count": total_count, "csrf_token": _csrf_token_for(user), "message": f"{deleted_count} 件のレポートを削除しました", "error": None},
+        {"request": request, "user": user.username, "total_count": total_count, "csrf_token": csrf_token_for(user), "message": f"{deleted_count} 件のレポートを削除しました", "error": None},
     )
 
 
@@ -728,9 +611,9 @@ async def report_list(
     date_to: str = "",
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
 
     from datetime import datetime, timedelta
 
@@ -808,12 +691,12 @@ async def report_delete(
     csrf_token: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
 
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     report = db.query(ReportData).filter(ReportData.id == report_id).first()
     if report:
@@ -821,7 +704,7 @@ async def report_delete(
         delete_screenshot(report.img_name, report.img_thumbnail_name)
         db.delete(report)
         db.commit()
-    return _redirect("/list")
+    return redirect("/list")
 
 
 # --- Report Detail ---
@@ -831,9 +714,9 @@ async def report_delete(
 async def report_detail(
     request: Request, report_id: int, db: Session = Depends(get_db)
 ):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
 
     report = db.query(ReportData).filter(ReportData.id == report_id).first()
     if not report:
@@ -868,7 +751,7 @@ async def report_detail(
             "thumb_url": thumb_url,
             "extend_info": extend_info,
             "user": user.username,
-            "csrf_token": _csrf_token_for(user),
+            "csrf_token": csrf_token_for(user),
         },
     )
 
@@ -894,7 +777,7 @@ def _tokens_page(request: Request, user: AdminUser, db: Session, **context):
             "request": request,
             "user": user.username,
             "tokens": tokens,
-            "csrf_token": _csrf_token_for(user),
+            "csrf_token": csrf_token_for(user),
             "mcp_enabled": settings.mcp_enabled,
             "mcp_url": f"{base_url}{settings.url_prefix}/mcp",
             "api_url": f"{base_url}{settings.url_prefix}/api/reports",
@@ -907,9 +790,9 @@ def _tokens_page(request: Request, user: AdminUser, db: Session, **context):
 
 @router.get("/tokens", response_class=HTMLResponse)
 async def api_token_list(request: Request, db: Session = Depends(get_db)):
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
+        return redirect("/login")
     return _tokens_page(request, user, db)
 
 
@@ -922,11 +805,11 @@ async def api_token_create(
     db: Session = Depends(get_db),
 ):
     """自分用の API トークンを発行する。平文はこの応答でだけ表示する。"""
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+        return redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     name = name.strip()
     if len(name) < 1 or len(name) > 100:
@@ -964,14 +847,14 @@ async def api_token_delete(
     db: Session = Depends(get_db),
 ):
     """自分のトークンを削除する（= 失効。履歴は残さない）。他人のトークンは対象外。"""
-    user = _get_current_user(request, db)
+    user = get_current_user(request, db)
     if not user:
-        return _redirect("/login")
-    if not _verify_csrf(csrf_token, user):
-        return _redirect("/login")
+        return redirect("/login")
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
 
     row = db.query(ApiToken).filter(ApiToken.id == token_id, ApiToken.user_id == user.id).first()
     if row:
         db.delete(row)
         db.commit()
-    return _redirect("/tokens")
+    return redirect("/tokens")

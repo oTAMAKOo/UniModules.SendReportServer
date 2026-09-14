@@ -64,9 +64,9 @@ def parse_extend_info(raw: str | None) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def report_detail_url(report_id: int) -> str:
-    """管理画面の詳細ページ URL。PUBLIC_BASE_URL が無ければプレフィックスからの相対パス。"""
-    return f"{settings.public_base_url}{settings.url_prefix}/detail/{report_id}"
+def report_detail_url(report: ReportData) -> str:
+    """管理画面の詳細ページ URL（/p/<slug>/detail/<id>）。PUBLIC_BASE_URL が無ければプレフィックスからの相対パス。"""
+    return f"{settings.public_base_url}{settings.url_prefix}/p/{report.project.slug}/detail/{report.id}"
 
 
 def absolute_image_url(path: str) -> str:
@@ -119,6 +119,7 @@ def report_summary(report: ReportData) -> dict:
         first_error = first_error[:SUMMARY_MESSAGE_LENGTH] + "…"
     return {
         "id": report.id,
+        "project": report.project.slug,
         "title": report.title,
         "created_at": _format_datetime(report.created_at),
         "user_id": report.user_id,
@@ -128,7 +129,7 @@ def report_summary(report: ReportData) -> dict:
         "error_count": len(errors),
         "last_error": first_error,
         "has_screenshot": bool(report.img_name),
-        "detail_url": report_detail_url(report.id),
+        "detail_url": report_detail_url(report),
     }
 
 
@@ -137,6 +138,8 @@ def report_to_dict(report: ReportData) -> dict:
     entries = format_log(report.log)
     return {
         "id": report.id,
+        "project": report.project.slug,
+        "project_name": report.project.name,
         "title": report.title,
         "created_at": _format_datetime(report.created_at),
         "user_id": report.user_id,
@@ -144,7 +147,7 @@ def report_to_dict(report: ReportData) -> dict:
         "device_model": report.device_model,
         "extend_info": parse_extend_info(report.extend_info),
         "screenshot_url": absolute_image_url(report.img_name) if report.img_name else None,
-        "detail_url": report_detail_url(report.id),
+        "detail_url": report_detail_url(report),
         "logs": [
             {
                 "type": LOG_TYPE_NAMES.get(e["logType"], str(e["logType"])),
@@ -175,6 +178,7 @@ def report_to_markdown(report: ReportData) -> str:
     lines.append("")
     lines.append("| 項目 | 値 |")
     lines.append("|---|---|")
+    lines.append(f"| プロジェクト | {_escape_cell(report.project.name)} ({report.project.slug}) |")
     # created_at は UTC で保存されている（datetime.utcnow）。Claude が現地時刻と誤読しないよう明示する
     lines.append(f"| 投稿時間 | {_format_datetime(report.created_at) or '-'} (UTC) |")
     lines.append(f"| ユーザー | {report.user_name or 'None'} ({report.user_id or 'None'}) |")
@@ -184,7 +188,7 @@ def report_to_markdown(report: ReportData) -> str:
     lines.append(f"| ログ件数 | {len(entries)}（エラー・例外 {len(errors)} 件） |")
     if report.img_name:
         lines.append(f"| スクリーンショット | {absolute_image_url(report.img_name)} |")
-    lines.append(f"| 詳細ページ | {report_detail_url(report.id)} |")
+    lines.append(f"| 詳細ページ | {report_detail_url(report)} |")
     lines.append("")
 
     if errors:

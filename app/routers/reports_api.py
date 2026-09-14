@@ -5,6 +5,9 @@ HTTP クライアントからは中身を読めない。ここでは Authorizati
 受け付け、失敗時は JSON の 401 を返す。ブラウザから（詳細画面の「Markdown をコピー」）
 呼ぶ場合のためにセッション Cookie でも認証できる。
 
+見える範囲はトークンの持ち主が所属するプロジェクトに限る。検索は project（slug）で対象を
+指定する（所属が 1 つだけなら省略可）。所属外のレポート ID は存在しないものとして 404。
+
 書き込み系（削除等）は意図的に提供しない。
 """
 import logging
@@ -15,6 +18,13 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.auth import authenticate_api_token, extract_bearer_token
+from app.authz import (
+    REPORT_NOT_FOUND_MESSAGE,
+    ApiProjectError,
+    api_project_or_error,
+    resolve_report_for_user,
+    user_projects,
+)
 from app.database import get_db
 from app.models import AdminUser, ReportData
 from app.ratelimit import api_limiter
@@ -68,11 +78,19 @@ def get_api_user(request: Request, db: Session = Depends(get_db)) -> AdminUser:
     return user
 
 
-def _get_report_or_404(db: Session, report_id: int) -> ReportData:
-    report = db.query(ReportData).filter(ReportData.id == report_id).first()
+def _get_report_or_404(db: Session, user: AdminUser, report_id: int) -> ReportData:
+    """所属プロジェクトのレポートだけを返す。所属外は存在しないのと同じ 404（ID の存在を漏らさない）。"""
+    report = resolve_report_for_user(db, user, report_id)
     if report is None:
-        raise HTTPException(status_code=404, detail=f"レポート #{report_id} は存在しません（削除された可能性があります）")
+        raise HTTPException(status_code=404, detail=REPORT_NOT_FOUND_MESSAGE.format(id=report_id))
     return report
+
+
+def _project_or_error(db: Session, user: AdminUser, slug: str):
+    try:
+        return api_project_or_error(db, user, slug)
+    except ApiProjectError as e:
+        raise HTTPException(status_code=e.status, detail=e.message)
 
 
 def _wants_markdown(request: Request, fmt: str | None) -> bool:
@@ -82,6 +100,17 @@ def _wants_markdown(request: Request, fmt: str | None) -> bool:
     return "text/markdown" in accept or ("text/plain" in accept and "application/json" not in accept)
 
 
+@router.get("/projects")
+async def project_list(user: AdminUser = Depends(get_api_user), db: Session = Depends(get_db)):
+    """トークンの持ち主が参加しているプロジェクトと役割を返す。"""
+    return JSONResponse({
+        "items": [
+            {"slug": p.slug, "name": p.name, "role": role, "is_active": p.is_active}
+            for p, role in user_projects(db, user)
+        ]
+    })
+
+
 @router.get("/reports/{report_id:int}.md", response_class=PlainTextResponse)
 async def report_markdown(
     report_id: int,
@@ -89,7 +118,7 @@ async def report_markdown(
     db: Session = Depends(get_db),
 ):
     """レポート 1 件を Markdown で返す。"""
-    report = _get_report_or_404(db, report_id)
+    report = _get_report_or_404(db, user, report_id)
     return PlainTextResponse(report_to_markdown(report), media_type="text/markdown; charset=utf-8")
 
 
@@ -102,7 +131,7 @@ async def report_get(
     db: Session = Depends(get_db),
 ):
     """レポート 1 件を返す。?format=md か Accept: text/markdown で Markdown、それ以外は JSON。"""
-    report = _get_report_or_404(db, report_id)
+    report = _get_report_or_404(db, user, report_id)
     if _wants_markdown(request, format):
         return PlainTextResponse(report_to_markdown(report), media_type="text/markdown; charset=utf-8")
     return JSONResponse(report_to_dict(report))
@@ -110,6 +139,7 @@ async def report_get(
 
 @router.get("/reports")
 async def report_search(
+    project: str = Query("", description="プロジェクトの slug。参加プロジェクトが 1 つだけなら省略可"),
     q: str = Query("", description="全テキストフィールドの部分一致（管理画面の検索と同じ）"),
     date_from: str = Query("", description="YYYY-MM-DD（この日を含む）"),
     date_to: str = Query("", description="YYYY-MM-DD（この日を含む）"),
@@ -118,11 +148,13 @@ async def report_search(
     user: AdminUser = Depends(get_api_user),
     db: Session = Depends(get_db),
 ):
-    """レポートを検索し、新しい順に要約を返す。"""
-    query = search_reports_query(db, q, date_from, date_to)
+    """プロジェクト内のレポートを検索し、新しい順に要約を返す。"""
+    target = _project_or_error(db, user, project)
+    query = search_reports_query(db, q, date_from, date_to, project_id=target.id)
     total = query.count()
     reports = query.order_by(desc(ReportData.id)).offset((page - 1) * per_page).limit(per_page).all()
     return JSONResponse({
+        "project": target.slug,
         "total": total,
         "page": page,
         "per_page": per_page,

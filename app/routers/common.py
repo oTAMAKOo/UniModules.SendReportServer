@@ -136,7 +136,7 @@ async def issue_invite(target: AdminUser, note: str | None = None) -> dict:
 
 
 EMERGENCY_ADMIN_USERNAME = "emergency_admin"
-MIN_PASSWORD_LENGTH = 8
+MIN_PASSWORD_LENGTH = 6
 
 
 def reserved_usernames() -> set[str]:
@@ -160,7 +160,7 @@ def create_user(
 ) -> tuple[AdminUser | None, str | None]:
     """ユーザーを作成して (user, None) を返す。入力に問題があれば (None, エラー文)。
 
-    login_method が "password" ならパスワードユーザー（8 文字以上、必須）。
+    login_method が "password" ならパスワードユーザー（6 文字以上、必須）。
     "google" なら email だけを持つ招待中ユーザー（is_active=False）を作る。招待リンクの発行は
     呼び出し側（issue_invite）で行う。commit はここで行う。
     全ユーザー管理（システム管理者）とプロジェクトのメンバー管理（プロジェクト管理者）で共用する。

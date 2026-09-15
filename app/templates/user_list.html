@@ -32,7 +32,7 @@
 {% include "_invite_panel.html" %}
 
 <div class="ui-card add-form">
-    <h5 class="ui-card-title">メールアドレスで招待</h5>
+    <h5 class="ui-card-title">新しいユーザーを招待</h5>
     <div class="add-form-hint" style="margin:-6px 0 10px;">プロジェクトのメンバー追加・役割変更は各プロジェクトの「メンバー管理」で行います。ここでは全ユーザーのアカウント自体（有効/無効・システム管理者権限・パスワード・Google 連携）を管理します。</div>
     <form method="post" action="{{ PREFIX }}/admin/users/invite" id="invite-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

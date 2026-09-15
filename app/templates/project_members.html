@@ -22,7 +22,7 @@
 {% include "_invite_panel.html" %}
 
 <div class="ui-card add-form">
-    <h5 class="ui-card-title">メールアドレスで招待</h5>
+    <h5 class="ui-card-title">新しいメンバーを招待</h5>
     <form method="post" action="{{ project_url(project.slug, '/users/invite') }}" id="invite-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="add-form-row">

@@ -153,7 +153,7 @@
                 <span class="badge-recovery" title=".env の ADMIN_GOOGLE_EMAIL に指定されたアカウント。無効化・降格しても再起動時にシステム管理者権限・有効状態に戻ります">復旧用</span>
                 {% endif %}
             </td>
-            <td>
+            <td class="user-projects">
                 {% for m in u.memberships|sort(attribute='project.name') %}
                 <a class="badge-project{% if m.role == 'admin' %} admin{% endif %}" href="{{ project_url(m.project.slug, '/users') }}" title="{{ m.project.name }}: {% if m.role == 'admin' %}プロジェクト管理者{% else %}メンバー{% endif %}">{{ m.project.slug }}{% if m.role == 'admin' %} ★{% endif %}</a>
                 {% else %}

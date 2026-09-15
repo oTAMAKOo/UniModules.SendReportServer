@@ -402,7 +402,7 @@ async def member_reinvite(
     if not target.is_invite_pending and not settings.google_enabled:
         return _members_page(request, ctx, db, error="Google ログインが設定されていないため、Google 連携のリンクは発行できません")
 
-    return _members_page(request, ctx, db, invite=await issue_invite(target, request=request, inviter=ctx.user, project=ctx.project))
+    return _members_page(request, ctx, db, invite=await issue_invite(target, request=request, inviter=ctx.user, project=ctx.project, resend=True))
 
 
 # --- プロジェクト設定（AES Key/IV、プロジェクト管理者） ---

@@ -428,6 +428,7 @@ async def user_set_email(
             note="既存の Google 連携を解除しました。本人がこのアドレスの Google アカウントでログインし直すと再連携されます",
             request=request,
             inviter=user,
+            resend=True,
         ))
 
     if not target.has_password and is_last_active_superuser(db, target):
@@ -466,7 +467,7 @@ async def user_reinvite(
     if not target.is_invite_pending and not settings.google_enabled:
         return _users_page(request, user, db, error="Google ログインが設定されていないため、Google 連携のリンクは発行できません")
 
-    return _users_page(request, user, db, invite=await issue_invite(target, request=request, inviter=user))
+    return _users_page(request, user, db, invite=await issue_invite(target, request=request, inviter=user, resend=True))
 
 
 # --- System Config（全体共通: セッション有効期限） ---

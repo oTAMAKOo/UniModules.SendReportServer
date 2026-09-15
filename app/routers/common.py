@@ -116,12 +116,15 @@ async def issue_invite(
     request: Request | None = None,
     inviter: AdminUser | None = None,
     project: Project | None = None,
+    resend: bool = False,
 ) -> dict:
     """招待リンクを発行し、MAIL_MODE に応じてメールを送る。画面表示用の情報を返す。
 
     リンク先は有効化ページ（/invite/{token}）で、本人が Google ログインかパスワード設定を選ぶ。
     リンクのホストは PUBLIC_BASE_URL。未設定なら request.base_url（nginx 越しでは http になる）で補う。
     inviter / project はメール本文に載せる（誰がどのプロジェクトに招待したか）。
+    resend=True は既に招待・連携の案内を送った相手への再発行。画面の文言を「再送 / 再発行」に変える
+    （初めての招待と同じ文言だと、二重に招待できてしまったように見えるため）。
     メール送信（SMTP / SES）は同期 I/O なので、イベントループを塞いでレポート受信まで
     止めないようスレッドプールで実行する。
     """
@@ -138,6 +141,7 @@ async def issue_invite(
         "mail_error": None,
         "note": note,
         "pending": target.is_invite_pending,
+        "resend": resend,
     }
     if mail_enabled():
         try:
@@ -271,7 +275,10 @@ def create_invited_user(
     if not email or not is_valid_email(email):
         return None, "メールアドレスの形式が正しくありません"
     if db.query(AdminUser).filter(AdminUser.email == email).first():
-        return None, f"メールアドレス '{email}' は既に登録されています"
+        return None, (
+            f"メールアドレス '{email}' は既に登録されています"
+            "（招待中の相手にリンクを送り直すときは、一覧の「⋯」から「招待を再発行」を使ってください）"
+        )
 
     new_user = AdminUser(
         username=suggest_username(db, email),

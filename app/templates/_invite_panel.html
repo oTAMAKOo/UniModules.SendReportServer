@@ -2,7 +2,7 @@
 {% if invite %}
 <div class="alert alert-success invite-panel">
     {% if invite.mail_sent %}
-    <strong>{{ invite.email }}</strong> に招待メールを送りました（リンクの有効期限 {{ invite.expire_hours }} 時間）。
+    <strong>{{ invite.email }}</strong> に招待メールを{% if invite.resend %}再送{% else %}送り{% endif %}ました（リンクの有効期限 {{ invite.expire_hours }} 時間）。
     {% if invite.note %}<br>{{ invite.note }}{% endif %}
     <details class="invite-details">
         <summary>メールが届かない場合はリンクを直接伝える</summary>
@@ -12,7 +12,7 @@
         </div>
     </details>
     {% else %}
-    <strong>{{ invite.email }}</strong> への招待リンクを発行しました。
+    <strong>{{ invite.email }}</strong> への招待リンクを{% if invite.resend %}再発行{% else %}発行{% endif %}しました。
     {% if invite.note %}<br>{{ invite.note }}{% endif %}
     {% if invite.mail_error %}
     <br><span class="text-danger">招待メールの送信に失敗しました（{{ invite.mail_error }}）。</span>

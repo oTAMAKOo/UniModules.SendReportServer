@@ -24,7 +24,7 @@
 | Lightsail インスタンス + 固定 IP + ファイアウォール | サーバー本体 | 1 |
 | DNS の A レコード | HTTPS 用のホスト名 | 1 |
 | （任意）運用者用の読み取り専用 IAM ユーザー | 状態確認・コスト確認 | 1 |
-| （任意）SES | 管理画面の招待メール送信 | - |
+| SES（ドメイン検証 + サンドボックス解除） | 管理画面の招待メール送信 | 1 ドメイン |
 
 すべて **東京リージョン（ap-northeast-1）** で作成してください。
 
@@ -248,13 +248,84 @@ HTTPS 証明書（Let's Encrypt）はサーバー側で取得するので、ACM 
 }
 ```
 
-## 6. 任意: 招待メール（SES）
+## 6. 招待メール（SES）— 管理画面で人を招待するなら必須
 
-管理画面で Google ログインのユーザーを招待するときにメールを自動送信したい場合だけ必要です。
-未設定でも招待リンクを画面に表示して手渡しできるので、最初は無しで問題ありません。
+管理画面はユーザーを**メールアドレスで招待**します（本人に届いたリンク先で Google ログインかパスワード設定を選ぶ）。
+そのメールを Amazon SES で送るための設定です。未設定でも招待リンクを画面に表示して手渡しできるので
+サーバーは動きますが、運用上はほぼ必須と考えてください。すべて東京リージョン（ap-northeast-1）で行います。
 
-必要な場合: SES で送信元ドメイン（または送信元アドレス）を検証し、サンドボックス解除を申請します。
-サーバー用 IAM ユーザーに `ses:SendEmail` / `ses:SendRawEmail` を追加してください。
+### 6-1. 送信元ドメインの検証（DKIM）
+
+送信元は `buglog@<ドメイン>` のようなアドレスにします（返信は受け取らないので実在のメールボックスは不要）。
+ドメイン単位で検証すると、そのドメインのどのアドレスからでも送れます。
+
+1. SES コンソール → ID → 「ID の作成」→ 種類 **ドメイン**、ドメイン名 `<ドメイン>`（例 `example.com`）
+2. 「DKIM」は **Easy DKIM、RSA_2048_BIT** のまま作成
+3. 表示される **CNAME レコード 3 本**を DNS に追加する（Route 53 なら「Route 53 でレコードを公開」ボタンで自動追加できる）
+4. 数分〜72 時間で「検証済み」になる（`aws sesv2 get-email-identity` の `VerificationStatus` が `SUCCESS`）
+
+> 既存のメール（MX / SPF / DMARC）には触りません。SES は既定で amazonses.com の MAIL FROM ドメインを使うので
+> 既存ドメインの SPF に影響せず、DKIM が揃えば DMARC も通ります。
+
+CLI:
+
+```bash
+DOMAIN=<ドメイン>
+aws sesv2 create-email-identity --region ap-northeast-1 --email-identity "$DOMAIN"
+aws sesv2 get-email-identity --region ap-northeast-1 --email-identity "$DOMAIN" \
+  --query 'DkimAttributes.Tokens' --output text     # 3 つのトークン → <token>._domainkey.<ドメイン> CNAME <token>.dkim.amazonses.com
+```
+
+Route 53 にレコードを入れる場合（ゾーン ID は Route 53 コンソールで確認）:
+
+```bash
+for t in $(aws sesv2 get-email-identity --region ap-northeast-1 --email-identity "$DOMAIN" --query 'DkimAttributes.Tokens' --output text); do
+  aws route53 change-resource-record-sets --hosted-zone-id <ゾーンID> --change-batch "{\"Changes\":[{\"Action\":\"UPSERT\",\"ResourceRecordSet\":{
+    \"Name\":\"${t}._domainkey.${DOMAIN}\",\"Type\":\"CNAME\",\"TTL\":1800,\"ResourceRecords\":[{\"Value\":\"${t}.dkim.amazonses.com\"}]}}]}"
+done
+```
+
+### 6-2. サンドボックスの解除（本番アクセスのリクエスト）
+
+新しいアカウント／リージョンの SES は**サンドボックス**で、**検証済みのアドレスにしか送れません**（200 通/日）。
+招待先は任意のアドレスなので、解除が必要です。
+
+1. SES コンソール → アカウントダッシュボード → 「本番アクセスのリクエスト」
+2. メールタイプ **トランザクション**、ウェブサイト URL に管理画面のホスト名、ユースケースの説明に
+   「社内ツール（バグレポート管理画面）のアカウント招待メール。管理者が招待した相手にのみ送信。月数十通」程度を記入
+3. 承認まで通常 24 時間以内。承認前にテストしたい場合は、受信側のアドレスも ID として検証すれば届く
+   （`aws sesv2 create-email-identity --email-identity you@example.com` → 届いた確認メールのリンクを開く）
+
+CLI:
+
+```bash
+aws sesv2 put-account-details --region ap-northeast-1 --production-access-enabled \
+  --mail-type TRANSACTIONAL --website-url "https://<FQDN>" \
+  --use-case-description "Internal bug report dashboard. Account invitation emails to users invited by an administrator. Low volume (tens per month)." \
+  --additional-contact-email-addresses <管理者のアドレス> --contact-language EN
+aws sesv2 get-account --region ap-northeast-1 --query 'ProductionAccessEnabled'
+```
+
+### 6-3. サーバー用 IAM ユーザーに送信権限を追加
+
+2 章の `BugLogServerS3Policy` に次の Statement を追加します（新しいバージョンを作って既定にする）。
+Resource は検証した ID に限定します。
+
+```json
+{
+  "Sid": "SendInviteMail",
+  "Effect": "Allow",
+  "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+  "Resource": "arn:aws:ses:ap-northeast-1:<アカウントID>:identity/<ドメイン>"
+}
+```
+
+> 送信元を `MAIL_FROM` に指定するアドレスの ID に限定できます。宛先は制限されません（招待先は任意のため）。
+
+### 6-4. サーバー側の設定（アプリ側の担当者）
+
+`.env` に `MAIL_MODE=ses` と `MAIL_FROM=buglog@<ドメイン>` を追加してコンテナを再作成します。
+管理画面で自分のアドレスを招待してメールが届けば完了です（`docs/google_auth_setup.md` 7 章）。
 
 ## 7. 引き渡すもの
 
@@ -276,7 +347,8 @@ HTTPS 証明書（Let's Encrypt）はサーバー側で取得するので、ACM 
 | ホスト名（FQDN） | | |
 | 22 番を許可した管理者 IP | | |
 | （任意）運用者用 IAM ユーザーのアクセスキー | | **秘匿** |
-| （任意）SES の送信元アドレス | | |
+| SES の送信元アドレス（`MAIL_FROM`） | `buglog@<ドメイン>` など | |
+| SES のサンドボックス解除の状態 | 承認済み / 申請中 | |
 
 ## 8. 引き渡し後にアプリ側が行うこと（参考）
 
@@ -305,4 +377,5 @@ HTTPS 証明書（Let's Encrypt）はサーバー側で取得するので、ACM 
 - [ ] 静的 IP をアタッチ済み
 - [ ] ファイアウォール: 22（管理者 IP のみ）/ 80 / 443 だけ。5432 と 8000 は無し
 - [ ] DNS の A レコードが静的 IP を指し、`nslookup` で解決できる
+- [ ] SES: 送信元ドメインが「検証済み」（DKIM の CNAME 3 本）、本番アクセス申請済み、`BugLogServerS3Policy` に `ses:SendEmail` を追加
 - [ ] 引き渡し表の項目を安全な経路で渡した

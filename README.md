@@ -61,15 +61,19 @@ cp .env.example .env
 | `PUBLIC_BASE_URL` / `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google ログインを使う場合に設定する（任意）。未設定ならパスワード認証のみ |
 | `ADMIN_GOOGLE_EMAIL` | ロックアウト復旧用（任意）。起動のたびに管理者権限を保証する Google アカウント |
 | `MCP_ENABLED` | Claude Code 向け MCP サーバー（`/buglog/mcp`）を公開するか（既定 `true`） |
+| `MAIL_MODE` / `MAIL_FROM` | 招待メールの送信方法。`none`（既定。リンクを画面に表示して手渡し）/ `ses`（AWS 認証情報を流用。`MAIL_FROM` は SES で検証済みのアドレス）/ `smtp`（`SMTP_*` も設定） |
 
 AES Key/IV は**プロジェクトごと**に持ち、各プロジェクトの設定画面（`/buglog/p/<slug>/settings`。プロジェクト管理者とシステム管理者が開ける）で変更する。
 初回起動時は `.env` の `REPORT_AES_KEY` / `REPORT_AES_IV` が最初のプロジェクトの鍵になる（どちらも無いと起動時に失敗する）。
 Unity クライアント側の `PLCryptoAES.KEY`（32文字）/ `PLCryptoAES.IV`（16文字）と一致させる。ズレていると受信が 400 になる。
 セッション有効期限は全体共通で、システム設定（`/buglog/system`）から変更できる。
 
-管理画面のログインは、ユーザー名 + パスワードに加えて **Google アカウント**でも行える（任意）。
-管理者が招待した Google アカウントだけがログインでき、Google ログインからユーザーが勝手に作られることはない。
-GCP 側の設定・招待の流れ・ロックアウト時の復旧は [docs/google_auth_setup.md](docs/google_auth_setup.md)。
+ユーザーの追加は**メールアドレスで招待**する。管理者はアドレス（+ 役割）だけを入力し、本人が届いたリンク先の
+有効化ページで **Google ログイン**か**ユーザー名 + パスワードの設定**を選んで有効化する（Google は任意。
+未設定ならパスワード側だけが出る）。招待メールは `MAIL_MODE`（SES / SMTP）で送り、未設定や送信失敗時は
+画面に表示されたリンクを手渡しする。管理者が招待した Google アカウントだけがログインでき、Google ログインから
+ユーザーが勝手に作られることはない。
+GCP 側の設定・招待の流れ・SES の準備・ロックアウト時の復旧は [docs/google_auth_setup.md](docs/google_auth_setup.md)。
 
 ### 3. 起動する
 

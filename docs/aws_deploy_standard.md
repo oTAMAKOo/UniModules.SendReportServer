@@ -396,6 +396,10 @@ SECRET_KEY=<ランダム文字列>
 
 # URL prefix
 URL_PREFIX=/buglog
+
+# 招待メール（任意。SES の準備は aws_setup_handoff.md 6 章。none なら招待リンクを画面で手渡し）
+MAIL_MODE=none
+MAIL_FROM=
 ```
 
 **ランダム生成:**

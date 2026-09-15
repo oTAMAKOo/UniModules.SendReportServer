@@ -358,6 +358,12 @@ ADMIN_PASSWORD=<強力なパスワード>
 SECRET_KEY=<ランダム文字列>
 
 URL_PREFIX=/buglog
+# 公開 URL（Google ログイン・招待リンクの組み立てに使う。HTTPS 化後に設定）
+PUBLIC_BASE_URL=https://<FQDN>
+
+# 招待メール（SES の準備は aws_setup_handoff.md 6 章。未設定なら招待リンクを画面で手渡し）
+MAIL_MODE=ses
+MAIL_FROM=buglog@<ドメイン>
 ```
 
 ランダム値の生成:
@@ -788,8 +794,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs app --tail 
 - `up` には**必ず** `-f docker-compose.yml -f docker-compose.prod.yml` を付ける。`-f` 無しで
   `docker compose up` すると開発用の設定（5432 公開、`./app` バインドマウント、`--reload`、
   DB パスワード `logserver`）で上がってしまう
-- `.env` の設定項目が増えた更新（例: Google ログインの `PUBLIC_BASE_URL` / `GOOGLE_*`）は、
-  `.env.example` の差分を見て `.env` に追記してから `up -d --build` する
+- `.env` の設定項目が増えた更新（例: Google ログインの `PUBLIC_BASE_URL` / `GOOGLE_*`、招待メールの
+  `MAIL_MODE` / `MAIL_FROM`）は、`.env.example` の差分を見て `.env` に追記してから `up -d --build` する
 - **マルチプロジェクト対応（マイグレーション 007）への更新は受信 URL が変わる。** 更新前に `.env` へ
   `INITIAL_PROJECT_SLUG` / `INITIAL_PROJECT_NAME` を追加し（`REPORT_AES_KEY` / `REPORT_AES_IV` は既存のまま残す）、
   `up -d --build` 後は配布済みクライアントの `POST /buglog/report` が 404 になるため、送信先を

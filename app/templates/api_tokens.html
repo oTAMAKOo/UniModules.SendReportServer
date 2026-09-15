@@ -3,130 +3,24 @@
 {% block extra_css %}
 <style>
     .container { max-width: 960px; }
-    .panel {
-        background: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 20px;
-        color: var(--text-primary);
-    }
-    .panel h4 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }
-    .panel p, .panel li { color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
-    .panel .form-label { color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; }
-    .panel .form-control, .panel .form-select {
-        background: var(--bg-log-odd);
-        border-color: var(--border-color);
-        color: var(--text-primary);
-    }
-    .panel .form-control:focus, .panel .form-select:focus {
-        background: var(--bg-log-odd);
-        color: var(--text-primary);
-        border-color: #5a9fd4;
-        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
-    }
+    .ui-card p, .ui-card li { color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
+    .ui-card p:last-child { margin-bottom: 0; }
     .token-form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
-    .token-form-row .field { min-width: 220px; }
-    .token-form-row .field.narrow { min-width: 140px; }
-    .new-token {
-        border: 1px solid #4caf50;
-        background: rgba(76,175,80,0.08);
-    }
-    .new-token .token-value {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        margin: 8px 0;
-    }
-    .new-token code {
-        flex: 1;
-        display: block;
-        padding: 8px 10px;
-        background: var(--bg-input);
-        border: 1px solid var(--border-input);
-        border-radius: 6px;
-        color: var(--text-primary);
-        font-size: 13px;
-        word-break: break-all;
-        user-select: all;
-    }
-    .copy-btn {
-        background: var(--accent);
-        border: 1px solid var(--accent);
-        color: #fff;
-        border-radius: 4px;
-        padding: 4px 14px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-        white-space: nowrap;
-        transition: background-color 0.15s, border-color 0.15s;
-    }
-    .copy-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
-    .copy-btn.copied { background: #4caf50; border-color: #4caf50; color: #fff; }
-    .setup-steps { margin-top: 16px; border-top: 1px solid rgba(76,175,80,0.3); padding-top: 12px; }
-    .setup-steps h5 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+    .token-form-row .field { min-width: 240px; flex: 1; }
+    .token-form-row .field.narrow { min-width: 140px; flex: 0 0 auto; }
+    .new-token { border-color: rgba(63,185,80,0.6); box-shadow: 0 0 0 3px rgba(63,185,80,0.12), var(--shadow-card); }
+    .new-token .token-value { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+    .new-token code.token { flex: 1; display: block; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border-input); border-radius: 8px; color: var(--text-primary); font-size: 13px; word-break: break-all; user-select: all; }
+    .setup-steps { margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 12px; }
+    .setup-steps h5 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
     .setup-steps ol { padding-left: 20px; margin-bottom: 10px; }
     .os-tabs { display: flex; gap: 4px; margin-top: 10px; border-bottom: 1px solid var(--border-color); }
-    .os-tab {
-        background: none;
-        border: 1px solid transparent;
-        border-bottom: none;
-        border-radius: 6px 6px 0 0;
-        color: var(--text-secondary);
-        font-size: 13px;
-        padding: 6px 14px;
-        cursor: pointer;
-        margin-bottom: -1px;
-    }
+    .os-tab { background: none; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: var(--text-secondary); font-size: 13px; padding: 6px 14px; cursor: pointer; margin-bottom: -1px; }
     .os-tab:hover { color: var(--text-primary); }
-    .os-tab.active {
-        background: var(--bg-input);
-        border-color: var(--border-color);
-        color: var(--text-primary);
-        font-weight: 600;
-    }
+    .os-tab.active { background: var(--bg-input); border-color: var(--border-color); color: var(--text-primary); font-weight: 600; }
     .os-pane { display: none; }
     .os-pane.active { display: block; }
-    .os-pane .snippet-head { margin-top: 10px; }
     .os-pane pre.snippet { margin-top: 6px; }
-    .dark-table {
-        width: 100%;
-        border-collapse: collapse;
-        color: var(--text-primary);
-        font-size: 13px;
-    }
-    .dark-table th {
-        background-color: var(--bg-table-th);
-        color: var(--text-secondary);
-        border: 1px solid var(--border-color);
-        padding: 8px 12px;
-        font-weight: normal;
-        white-space: nowrap;
-    }
-    .dark-table td {
-        background-color: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        padding: 8px 12px;
-        vertical-align: middle;
-    }
-    .badge-status { font-size: 11px; padding: 3px 8px; border-radius: 10px; }
-    .badge-active { background: rgba(76,175,80,0.15); color: #4caf50; }
-    .badge-expired { background: rgba(248,81,73,0.15); color: #f85149; }
-    pre.snippet {
-        background: var(--bg-input);
-        color: var(--text-primary);
-        border: 1px solid var(--border-input);
-        border-radius: 6px;
-        padding: 12px;
-        font-size: 12px;
-        margin: 8px 0 12px;
-        white-space: pre-wrap;
-        word-break: break-all;
-    }
-    .snippet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .snippet-head span { color: var(--text-secondary); font-size: 12px; }
-    .alert { font-size: 14px; }
     .muted { color: var(--text-secondary); }
 </style>
 {% endblock %}
@@ -137,129 +31,142 @@
     <span class="page-header-title">API トークン</span>
 </div>
 
+<div class="page-title">
+    <h2>API トークン<small>{{ user }}</small></h2>
+</div>
+
 {% if error %}
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
 {% if new_token %}
-<div class="panel new-token">
-    <h4>トークンを発行しました: {{ new_token.name }}</h4>
-    <p>この値は<strong>今だけ</strong>表示されます。閉じると二度と見られないので、控えてから離れてください。
-       漏れた場合は下の一覧から削除し、作り直してください。</p>
-    <div class="token-value">
-        <code id="new-token-value">{{ new_token.plain }}</code>
-        <button type="button" class="copy-btn" data-copy-target="new-token-value" onclick="copyFrom(this)">コピー</button>
-    </div>
-    <div class="setup-steps">
-        <h5>セットアップ</h5>
-        <ol>
-            <li>下のコマンドを「コピー」し、PowerShell またはターミナルに貼り付けて Enter を押す</li>
-            <li>Claude Code を再起動する</li>
-        </ol>
-        <div class="os-tabs" role="tablist">
-            <button type="button" class="os-tab" data-os="windows" onclick="selectOs('windows')">Windows</button>
-            <button type="button" class="os-tab" data-os="unix" onclick="selectOs('unix')">macOS / Linux</button>
+<div class="ui-card new-token">
+    <div class="ui-card-body">
+        <h5 class="ui-card-title"><span class="pill on">発行済み</span>{{ new_token.name }}</h5>
+        <p>この値は<strong>今だけ</strong>表示されます。閉じると二度と見られないので、控えてから離れてください。
+           漏れた場合は下の一覧から削除し、作り直してください。</p>
+        <div class="token-value">
+            <code class="token" id="new-token-value">{{ new_token.plain }}</code>
+            <button type="button" class="btn-accent sm" data-copy-target="new-token-value" onclick="copyFrom(this)">コピー</button>
         </div>
-        <div class="os-pane" data-os="windows">
-            <div class="snippet-head">
-                <span>PowerShell に貼り付け</span>
-                <button type="button" class="copy-btn" data-copy-target="setup-windows" onclick="copyFrom(this)">コピー</button>
+        <div class="setup-steps">
+            <h5>セットアップ</h5>
+            <ol>
+                <li>下のコマンドを「コピー」し、PowerShell またはターミナルに貼り付けて Enter を押す</li>
+                <li>Claude Code を再起動する</li>
+            </ol>
+            <div class="os-tabs" role="tablist">
+                <button type="button" class="os-tab" data-os="windows" onclick="selectOs('windows')">Windows</button>
+                <button type="button" class="os-tab" data-os="unix" onclick="selectOs('unix')">macOS / Linux</button>
             </div>
+            <div class="os-pane" data-os="windows">
+                <div class="snippet-head">
+                    <span>PowerShell に貼り付け</span>
+                    <button type="button" class="btn-ghost" data-copy-target="setup-windows" onclick="copyFrom(this)">コピー</button>
+                </div>
 <pre class="snippet" id="setup-windows">[Environment]::SetEnvironmentVariable("BUGLOG_TOKEN", "{{ new_token.plain }}", "User"); $env:BUGLOG_TOKEN = "{{ new_token.plain }}"</pre>
-        </div>
-        <div class="os-pane" data-os="unix">
-            <div class="snippet-head">
-                <span>ターミナルに貼り付け</span>
-                <button type="button" class="copy-btn" data-copy-target="setup-unix" onclick="copyFrom(this)">コピー</button>
             </div>
+            <div class="os-pane" data-os="unix">
+                <div class="snippet-head">
+                    <span>ターミナルに貼り付け</span>
+                    <button type="button" class="btn-ghost" data-copy-target="setup-unix" onclick="copyFrom(this)">コピー</button>
+                </div>
 <pre class="snippet" id="setup-unix">RC="$HOME/.zshrc"; [ -n "$BASH_VERSION" ] && RC="$HOME/.bashrc"; sed -i.bak '/^export BUGLOG_TOKEN=/d' "$RC" 2>/dev/null; rm -f "$RC.bak"; echo 'export BUGLOG_TOKEN={{ new_token.plain }}' >> "$RC"; export BUGLOG_TOKEN={{ new_token.plain }}</pre>
+            </div>
         </div>
     </div>
 </div>
 {% endif %}
 
-<div class="panel">
-    <h4>新しいトークンを発行</h4>
-    <p>Claude Code からレポートを読むための、あなた専用のトークンです。ログインしているアカウントの権限で
-       レポートの<strong>閲覧・検索だけ</strong>ができます（削除や設定変更はできません）。PC やツールごとに 1 つ発行し、
-       使わなくなったら削除してください（削除すると即座に使えなくなります）。</p>
-    <form method="post" action="{{ PREFIX }}/tokens/create">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="token-form-row">
-            <div class="field">
-                <label class="form-label" for="token-name">名前（用途や PC 名）</label>
-                <input type="text" class="form-control form-control-sm" id="token-name" name="name" maxlength="100" placeholder="例: 開発PC Claude Code" required>
+<div class="ui-card">
+    <div class="ui-card-body">
+        <h5 class="ui-card-title">新しいトークンを発行</h5>
+        <p>Claude Code からレポートを読むための、あなた専用のトークンです。ログインしているアカウントの権限で
+           レポートの<strong>閲覧・検索だけ</strong>ができます（削除や設定変更はできません）。PC やツールごとに 1 つ発行し、
+           使わなくなったら削除してください（削除すると即座に使えなくなります）。</p>
+        <form method="post" action="{{ PREFIX }}/tokens/create" style="margin-top:14px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="token-form-row">
+                <div class="field">
+                    <label for="token-name">名前（用途や PC 名）</label>
+                    <input type="text" class="form-control form-control-sm" id="token-name" name="name" maxlength="100" placeholder="例: 開発PC Claude Code" required>
+                </div>
+                <div class="field narrow">
+                    <label for="token-expires">有効期限</label>
+                    <select class="form-select form-select-sm" id="token-expires" name="expires_days">
+                        {% for days in expire_choices %}
+                        <option value="{{ days }}" {% if days == 90 %}selected{% endif %}>{% if days == 0 %}無期限{% else %}{{ days }} 日{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field narrow">
+                    <button type="submit" class="btn-accent">発行する</button>
+                </div>
             </div>
-            <div class="field narrow">
-                <label class="form-label" for="token-expires">有効期限</label>
-                <select class="form-select form-select-sm" id="token-expires" name="expires_days">
-                    {% for days in expire_choices %}
-                    <option value="{{ days }}" {% if days == 90 %}selected{% endif %}>{% if days == 0 %}無期限{% else %}{{ days }} 日{% endif %}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="field narrow">
-                <button type="submit" class="btn btn-primary btn-sm">発行する</button>
-            </div>
-        </div>
-    </form>
-</div>
-
-<div class="panel">
-    <h4>発行済みのトークン</h4>
-    {% if tokens %}
-    <table class="dark-table">
-        <thead>
-            <tr>
-                <th>名前</th>
-                <th>先頭</th>
-                <th>発行日</th>
-                <th>最終使用</th>
-                <th>有効期限</th>
-                <th>状態</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for t in tokens %}
-            <tr>
-                <td>{{ t.name }}</td>
-                <td><code class="muted">{{ t.token_prefix }}…</code></td>
-                <td>{{ t.created_at.strftime('%Y-%m-%d') }}</td>
-                <td>{% if t.last_used_at %}{{ t.last_used_at.strftime('%Y-%m-%d %H:%M') }}{% else %}<span class="muted">未使用</span>{% endif %}</td>
-                <td>{% if t.expires_at %}{{ t.expires_at.strftime('%Y-%m-%d') }}{% else %}<span class="muted">無期限</span>{% endif %}</td>
-                <td>
-                    {% if t.is_expired %}<span class="badge-status badge-expired">期限切れ</span>
-                    {% else %}<span class="badge-status badge-active">有効</span>{% endif %}
-                </td>
-                <td>
-                    <form method="post" action="{{ PREFIX }}/tokens/delete/{{ t.id }}" data-name="{{ t.name }}" data-usable="{{ 1 if t.is_usable else 0 }}" onsubmit="return confirmDelete(this)">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="muted">まだトークンはありません。</p>
-    {% endif %}
-</div>
-
-<div class="panel">
-    <h4>Claude Code での使い方</h4>
-    <p>各メンバーは、トークンを発行して緑の枠のコマンドを実行するだけです（環境変数 <code>BUGLOG_TOKEN</code> に保存されます）。
-       MCP サーバーの登録はプロジェクトの <code>.mcp.json</code> で一度だけ行い、チームで共有します。
-       あとはレポートの URL（<code>{{ PREFIX }}/p/&lt;slug&gt;/detail/…</code>）を Claude に貼るだけで、Claude が <code>get_report</code> ツールでログ全文を読みます。
-       トークン 1 つで参加している全プロジェクト{% if project_slugs %}（{{ project_slugs | join(', ') }}）{% endif %}のレポートを読めます。
-       検索（<code>search_reports</code> / <code>list_recent_reports</code>）は参加プロジェクトが 2 つ以上あるとき <code>project</code>（slug）の指定が必要です（1 つなら省略可）。
-       手順の詳細はリポジトリの <code>docs/claude_integration.md</code> にあります。</p>
-    {% if mcp_enabled %}
-    <div class="snippet-head">
-        <span>プロジェクトで共有する場合（リポジトリ直下の <code>.mcp.json</code>。トークンは含めない）</span>
-        <button type="button" class="copy-btn" data-copy-target="snippet-mcp-json" onclick="copyFrom(this)">コピー</button>
+        </form>
     </div>
+</div>
+
+<div class="ui-card">
+    <div class="ui-card-body">
+        <h5 class="ui-card-title">発行済みのトークン<small class="muted" style="font-weight:400;">{{ tokens | length }} 件</small></h5>
+        {% if tokens %}
+        <div class="ui-table-wrap">
+        <table class="ui-table">
+            <thead>
+                <tr>
+                    <th>名前</th>
+                    <th>先頭</th>
+                    <th>発行日</th>
+                    <th>最終使用</th>
+                    <th>有効期限</th>
+                    <th>状態</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tokens %}
+                <tr>
+                    <td>{{ t.name }}</td>
+                    <td><code>{{ t.token_prefix }}…</code></td>
+                    <td>{{ t.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>{% if t.last_used_at %}{{ t.last_used_at.strftime('%Y-%m-%d %H:%M') }}{% else %}<span class="muted">未使用</span>{% endif %}</td>
+                    <td>{% if t.expires_at %}{{ t.expires_at.strftime('%Y-%m-%d') }}{% else %}<span class="muted">無期限</span>{% endif %}</td>
+                    <td>
+                        {% if t.is_expired %}<span class="pill off">期限切れ</span>
+                        {% else %}<span class="pill on">有効</span>{% endif %}
+                    </td>
+                    <td style="text-align:right;">
+                        <form method="post" action="{{ PREFIX }}/tokens/delete/{{ t.id }}" data-name="{{ t.name }}" data-usable="{{ 1 if t.is_usable else 0 }}" onsubmit="return confirmDelete(this)" style="margin:0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-ghost danger">削除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="muted">まだトークンはありません。</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="ui-card">
+    <div class="ui-card-body">
+        <h5 class="ui-card-title">Claude Code での使い方</h5>
+        <p>各メンバーは、トークンを発行して緑の枠のコマンドを実行するだけです（環境変数 <code>BUGLOG_TOKEN</code> に保存されます）。
+           MCP サーバーの登録はプロジェクトの <code>.mcp.json</code> で一度だけ行い、チームで共有します。
+           あとはレポートの URL（<code>{{ PREFIX }}/p/&lt;slug&gt;/detail/…</code>）を Claude に貼るだけで、Claude が <code>get_report</code> ツールでログ全文を読みます。
+           トークン 1 つで参加している全プロジェクト{% if project_slugs %}（{{ project_slugs | join(', ') }}）{% endif %}のレポートを読めます。
+           検索（<code>search_reports</code> / <code>list_recent_reports</code>）は参加プロジェクトが 2 つ以上あるとき <code>project</code>（slug）の指定が必要です（1 つなら省略可）。
+           手順の詳細はリポジトリの <code>docs/claude_integration.md</code> にあります。</p>
+        {% if mcp_enabled %}
+        <div class="snippet-head">
+            <span>プロジェクトで共有する場合（リポジトリ直下の <code>.mcp.json</code>。トークンは含めない）</span>
+            <button type="button" class="btn-ghost" data-copy-target="snippet-mcp-json" onclick="copyFrom(this)">コピー</button>
+        </div>
 <pre class="snippet" id="snippet-mcp-json">{
   "mcpServers": {
     "buglog": {
@@ -271,19 +178,20 @@
     }
   }
 }</pre>
-    <div class="snippet-head">
-        <span>プロジェクトに <code>.mcp.json</code> が無く、自分の環境だけに登録する場合（<code>claude</code> コマンドが使える環境のみ。デスクトップアプリだけでは使えません）</span>
-        <button type="button" class="copy-btn" data-copy-target="snippet-mcp-cli" onclick="copyFrom(this)">コピー</button>
-    </div>
+        <div class="snippet-head">
+            <span>プロジェクトに <code>.mcp.json</code> が無く、自分の環境だけに登録する場合（<code>claude</code> コマンドが使える環境のみ。デスクトップアプリだけでは使えません）</span>
+            <button type="button" class="btn-ghost" data-copy-target="snippet-mcp-cli" onclick="copyFrom(this)">コピー</button>
+        </div>
 <pre class="snippet" id="snippet-mcp-cli">claude mcp add --transport http --scope user buglog {{ mcp_url }} --header "Authorization: Bearer ${BUGLOG_TOKEN}"</pre>
-    {% else %}
-    <p class="muted">この環境では MCP サーバーが無効になっています（<code>.env</code> の <code>MCP_ENABLED</code>）。読み取り API のみ使えます。</p>
-    {% endif %}
-    <div class="snippet-head">
-        <span>読み取り API を直接呼ぶ場合（Markdown で 1 件取得）</span>
-        <button type="button" class="copy-btn" data-copy-target="snippet-curl" onclick="copyFrom(this)">コピー</button>
+        {% else %}
+        <p class="muted">この環境では MCP サーバーが無効になっています（<code>.env</code> の <code>MCP_ENABLED</code>）。読み取り API のみ使えます。</p>
+        {% endif %}
+        <div class="snippet-head">
+            <span>読み取り API を直接呼ぶ場合（Markdown で 1 件取得）</span>
+            <button type="button" class="btn-ghost" data-copy-target="snippet-curl" onclick="copyFrom(this)">コピー</button>
+        </div>
+<pre class="snippet" id="snippet-curl" style="margin-bottom:0;">curl -H "Authorization: Bearer $BUGLOG_TOKEN" {{ api_url }}/123.md</pre>
     </div>
-<pre class="snippet" id="snippet-curl">curl -H "Authorization: Bearer $BUGLOG_TOKEN" {{ api_url }}/123.md</pre>
 </div>
 {% endblock %}
 

@@ -1,61 +1,40 @@
 {% extends "base.html" %}
 {% block title %}システム設定 - Log Server{% endblock %}
-{% block extra_css %}
-<style>
-    .config-form {
-        max-width: 500px;
-        margin: 0 auto;
-        background: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 24px;
-    }
-    .config-form h3 { color: var(--text-primary); margin-bottom: 20px; }
-    .config-form label { color: var(--text-secondary); font-size: 13px; }
-    .config-form .form-control {
-        background: var(--bg-log-odd);
-        border-color: var(--border-color);
-        color: var(--text-primary);
-        font-family: Consolas, 'Courier New', monospace;
-    }
-    .config-form .form-control:focus {
-        background: var(--bg-log-odd);
-        color: var(--text-primary);
-        border-color: #5a9fd4;
-        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
-    }
-    .config-form .btn-primary { width: 100%; margin-top: 8px; }
-    .config-form .form-text { color: var(--text-secondary); font-size: 12px; }
-    .alert { font-size: 14px; }
-
-</style>
-{% endblock %}
 {% block content %}
 <div class="page-header">
     <a class="page-header-back" href="{{ PREFIX }}/admin">管理メニュー</a>
     <span class="page-header-sep">›</span>
     <span class="page-header-title">システム設定</span>
 </div>
-<div class="config-form">
+<div class="ui-narrow">
     {% if message %}
     <div class="alert alert-success">{{ message }}</div>
     {% endif %}
     {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
     {% endif %}
-    <form method="post" action="{{ PREFIX }}/system">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="mb-3">
-            <label for="session_hours" class="form-label">セッション有効期限</label>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="number" class="form-control" id="session_hours" name="session_hours" value="{{ session_hours }}" min="1" max="8760" style="width: 120px;" required>
-                <span style="color: var(--text-secondary); font-size: 13px;">時間</span>
-            </div>
-            <div class="form-text">ログインからこの時間を経過すると自動ログアウトされます<br>（デフォルト: 24時間）</div>
+    <div class="ui-card">
+        <div class="ui-card-body">
+            <h5 class="ui-card-title">セッション</h5>
+            <form method="post" action="{{ PREFIX }}/system">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="field">
+                    <label for="session_hours">セッション有効期限</label>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="number" class="form-control" id="session_hours" name="session_hours" value="{{ session_hours }}" min="1" max="8760" style="width:140px;" required>
+                        <span class="ui-muted">時間</span>
+                    </div>
+                    <div class="hint">ログインからこの時間を経過すると自動ログアウトされます（既定 24 時間、1〜8760）。全プロジェクト共通の設定です</div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-accent">保存</button>
+                </div>
+            </form>
         </div>
-        <button type="submit" class="btn btn-primary">保存</button>
-    </form>
-    <hr style="border-color: var(--border-color); margin: 20px 0;">
-    <div class="form-text">AES Key / IV はプロジェクトごとに、各プロジェクトの設定画面（<code>{{ PREFIX }}/p/&lt;slug&gt;/settings</code>）で変更します。プロジェクトの一覧は<a href="{{ PREFIX }}/admin/projects">プロジェクト管理</a>。</div>
+        <div class="ui-card-foot">
+            <span class="ui-muted">AES Key / IV はプロジェクトごとに、各プロジェクトの設定画面（<code class="inline">{{ PREFIX }}/p/&lt;slug&gt;/settings</code>）で変更します。</span>
+            <a class="btn-ghost" href="{{ PREFIX }}/admin/projects">プロジェクト管理</a>
+        </div>
+    </div>
 </div>
 {% endblock %}

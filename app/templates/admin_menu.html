@@ -2,38 +2,19 @@
 {% block title %}管理メニュー - Log Server{% endblock %}
 {% block extra_css %}
 <style>
-    .am-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
-    .am-header h2 { color: var(--text-primary); font-size: 20px; font-weight: 600; margin: 0; }
-    .am-header h2 small { color: var(--text-secondary); font-size: 13px; font-weight: 400; margin-left: 10px; }
-    .am-section { color: var(--text-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 26px 0 10px; display: flex; align-items: center; gap: 10px; }
-    .am-section::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
-    .am-section:first-of-type { margin-top: 0; }
-    .am-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-
-    .am-card {
-        display: flex; flex-direction: column;
-        background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px;
-        box-shadow: var(--shadow-card); text-decoration: none; color: var(--text-primary);
-        transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-    }
-    a.am-card:hover { border-color: var(--accent); color: var(--text-primary); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
-    .am-card-body { padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start; }
-    .am-icon {
-        flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
-        display: flex; align-items: center; justify-content: center;
-        background: var(--bg-input); border: 1px solid var(--border-input); color: var(--accent);
-    }
+    a.ui-card { text-decoration: none; transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s; }
+    a.ui-card:hover { border-color: var(--accent); color: var(--text-primary); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
+    .am-body { display: flex; gap: 14px; align-items: flex-start; }
+    .am-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border: 1px solid var(--border-input); color: var(--accent); }
     .am-icon svg { width: 20px; height: 20px; }
     .am-icon.sys { color: #d9c8f5; background: rgba(75,58,107,0.35); border-color: rgba(75,58,107,0.6); }
     .am-icon.proj { color: #e3c95a; background: rgba(212,160,23,0.15); border-color: rgba(212,160,23,0.35); }
-    .am-card h5 { margin: 0 0 4px; font-size: 15px; font-weight: 600; line-height: 1.3; }
-    .am-card p { margin: 0; color: var(--text-secondary); font-size: 12.5px; line-height: 1.5; }
-    .am-slug { display: inline-block; margin-left: 8px; color: var(--text-secondary); font-size: 11px; font-family: Consolas, 'Courier New', monospace; background: var(--bg-input); border: 1px solid var(--border-input); padding: 1px 7px; border-radius: 5px; vertical-align: middle; }
+    .am-body h5 { margin: 0 0 4px; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--text-primary); }
+    .am-body p { margin: 0; color: var(--text-secondary); font-size: 12.5px; line-height: 1.5; }
+    .am-body .chip { margin-left: 8px; font-size: 11px; padding: 1px 7px; }
     .am-links { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 20px 14px; border-top: 1px solid var(--border-color); }
-    .btn-ghost { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 12px; padding: 4px 10px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
-    .btn-ghost:hover { color: var(--text-primary); border-color: var(--text-secondary); background: var(--bg-card-hover); }
-    .am-arrow { margin-left: auto; color: var(--text-secondary); opacity: 0.6; align-self: center; }
-    a.am-card:hover .am-arrow { color: var(--accent); opacity: 1; }
+    .am-arrow { margin-left: auto; color: var(--text-secondary); opacity: 0.6; align-self: center; font-size: 18px; }
+    a.ui-card:hover .am-arrow { color: var(--accent); opacity: 1; }
 </style>
 {% endblock %}
 {% block content %}
@@ -43,28 +24,28 @@
     <span class="page-header-title">管理メニュー</span>
 </div>
 
-<div class="am-header">
+<div class="page-title">
     <h2>管理メニュー<small>{{ user }}{% if is_superuser %} · システム管理者{% endif %}</small></h2>
 </div>
 
-<div class="am-section">アカウント</div>
-<div class="am-grid">
-    <a class="am-card" href="{{ PREFIX }}/password_change">
-        <div class="am-card-body">
+<div class="ui-section first">アカウント</div>
+<div class="ui-grid">
+    <a class="ui-card" href="{{ PREFIX }}/password_change">
+        <div class="ui-card-body am-body">
             <div class="am-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
             <div><h5>パスワード変更</h5><p>自分のパスワードを変更します</p></div>
             <span class="am-arrow">&#8250;</span>
         </div>
     </a>
-    <a class="am-card" href="{{ PREFIX }}/tokens">
-        <div class="am-card-body">
+    <a class="ui-card" href="{{ PREFIX }}/tokens">
+        <div class="ui-card-body am-body">
             <div class="am-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 1 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
             <div><h5>API トークン</h5><p>Claude Code（MCP）や読み取り API からレポートを読むための個人トークン</p></div>
             <span class="am-arrow">&#8250;</span>
         </div>
     </a>
-    <a class="am-card" href="{{ PREFIX }}/projects">
-        <div class="am-card-body">
+    <a class="ui-card" href="{{ PREFIX }}/projects">
+        <div class="ui-card-body am-body">
             <div class="am-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
             <div><h5>プロジェクト一覧</h5><p>参加しているプロジェクトのレポートを見る</p></div>
             <span class="am-arrow">&#8250;</span>
@@ -73,14 +54,14 @@
 </div>
 
 {% if admin_projects %}
-<div class="am-section">管理しているプロジェクト</div>
-<div class="am-grid">
+<div class="ui-section">管理しているプロジェクト</div>
+<div class="ui-grid">
     {% for p in admin_projects %}
-    <div class="am-card">
-        <div class="am-card-body">
+    <div class="ui-card">
+        <div class="ui-card-body am-body">
             <div class="am-icon proj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
             <div>
-                <h5>{{ p.name }}<span class="am-slug">{{ p.slug }}</span></h5>
+                <h5>{{ p.name }}<span class="chip">{{ p.slug }}</span></h5>
                 <p>メンバーの追加・役割変更、AES Key/IV の設定、期間指定の一括削除</p>
             </div>
         </div>
@@ -96,24 +77,24 @@
 {% endif %}
 
 {% if is_superuser %}
-<div class="am-section">システム管理</div>
-<div class="am-grid">
-    <a class="am-card" href="{{ PREFIX }}/admin/projects">
-        <div class="am-card-body">
+<div class="ui-section">システム管理</div>
+<div class="ui-grid">
+    <a class="ui-card" href="{{ PREFIX }}/admin/projects">
+        <div class="ui-card-body am-body">
             <div class="am-icon sys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></div>
             <div><h5>プロジェクト管理</h5><p>プロジェクトの作成・表示名や slug の変更・受信の停止・削除</p></div>
             <span class="am-arrow">&#8250;</span>
         </div>
     </a>
-    <a class="am-card" href="{{ PREFIX }}/admin/users">
-        <div class="am-card-body">
+    <a class="ui-card" href="{{ PREFIX }}/admin/users">
+        <div class="ui-card-body am-body">
             <div class="am-icon sys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
             <div><h5>全ユーザー管理</h5><p>全アカウントの作成・削除・有効/無効・システム管理者権限・パスワード・Google 連携</p></div>
             <span class="am-arrow">&#8250;</span>
         </div>
     </a>
-    <a class="am-card" href="{{ PREFIX }}/system">
-        <div class="am-card-body">
+    <a class="ui-card" href="{{ PREFIX }}/system">
+        <div class="ui-card-body am-body">
             <div class="am-icon sys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
             <div><h5>システム設定</h5><p>セッション有効期限など全体共通の設定</p></div>
             <span class="am-arrow">&#8250;</span>

@@ -2,39 +2,46 @@
 {% block title %}{{ report.title or 'Report' }} #{{ report.id }} - Log Server{% endblock %}
 {% block extra_css %}
 <style>
-    .navbar { margin-bottom: 10px; }
     .container { max-width: 95vw; }
     .detail-well {
         width: 90vw;
         margin: 0 auto;
     }
-    .detail-well h2 { color: var(--text-primary); margin-bottom: 16px; }
+    .page-title h2 { font-size: 18px; overflow: hidden; text-overflow: ellipsis; }
+    .copy-btn .copy-label { white-space: nowrap; }
     .dark-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         color: var(--text-primary);
-        font-size: 14px;
+        font-size: 13.5px;
+        margin: 0;
     }
     .dark-table th, .dark-table td {
-        border: 1px solid var(--border-color);
-        padding: 6px 10px;
+        border-bottom: 1px solid var(--border-color);
+        padding: 9px 14px;
         vertical-align: top;
     }
+    .dark-table tr:last-child th, .dark-table tr:last-child td { border-bottom: none; }
     .dark-table th {
         background-color: var(--bg-table-th);
         color: var(--text-secondary);
-        width: 120px;
+        width: 142px;
         white-space: nowrap;
-        font-weight: normal;
+        font-weight: 600;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        border-right: 1px solid var(--border-color);
     }
     .dark-table td {
-        background-color: var(--bg-table-td);
+        background-color: var(--bg-card);
         word-break: break-all;
     }
     .dark-table .screenshot-cell {
         text-align: left;
-        padding: 10px;
-        background-color: var(--bg-table-td);
+        padding: 14px;
+        background-color: var(--bg-card);
     }
     .dark-table .screenshot-cell img {
         max-width: 600px;
@@ -141,21 +148,7 @@
         font-family: Consolas, 'Courier New', monospace;
     }
     /* Copy button below stacktrace */
-    .copy-btn {
-        background: none;
-        border: 1px solid var(--border-color);
-        color: var(--text-secondary);
-        border-radius: 4px;
-        padding: 4px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        margin: 6px 8px;
-    }
-    .copy-btn:hover { color: var(--text-primary); border-color: var(--text-primary); }
-    .copy-btn.copied { color: #4caf50; border-color: #4caf50; }
+    #StackTrace + .copy-btn { margin: 8px 12px; }
 
     /* モバイル対応 */
     @media screen and (max-width: 768px) {
@@ -187,22 +180,27 @@
 </style>
 {% endblock %}
 {% block content %}
-<div class="page-header" style="justify-content: space-between;">
-    <a class="page-header-back" href="{{ project_url(project.slug, '/list') }}">&laquo; {{ project.name }} のレポート一覧</a>
-    <div style="display:flex; align-items:center; gap:8px;">
-        <button type="button" class="copy-btn" style="margin:0;" data-md-url="{{ PREFIX }}/api/reports/{{ report.id }}.md"
+<div class="detail-well">
+<div class="page-header">
+    <a class="page-header-back" href="{{ project_url(project.slug, '/list') }}">{{ project.name }}</a>
+    <span class="page-header-sep">›</span>
+    <span class="page-header-title">レポート #{{ report.id }}</span>
+</div>
+<div class="page-title">
+    <h2>{{ report.title or '(タイトルなし)' }}<small>#{{ report.id }} · {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</small></h2>
+    <div class="actions">
+        <button type="button" class="btn-ghost primary copy-btn" data-md-url="{{ PREFIX }}/api/reports/{{ report.id }}.md"
                 onclick="copyMarkdown(this)" title="Claude に貼り付けられる Markdown 形式でレポート全文をコピー">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             <span class="copy-label">Markdown をコピー</span>
         </button>
         <form method="post" action="{{ project_url(project.slug, '/delete/' ~ report.id) }}" onsubmit="return confirm('このレポートを削除しますか？')" style="margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
+            <button type="submit" class="btn-ghost danger">削除</button>
         </form>
     </div>
 </div>
-<div class="detail-well">
-    <div>
+    <div class="ui-card">
         <table class="dark-table">
             {# Screenshot #}
             {% if img_url %}
@@ -276,7 +274,7 @@
 {{ entry.stacktrace }}</p>
                         {% endfor %}
                     </div>
-                    <button class="copy-btn" onclick="copyStacktrace(this)" title="Copy to clipboard">
+                    <button class="btn-ghost copy-btn" onclick="copyStacktrace(this)" title="Copy to clipboard">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         <span class="copy-label">Copy</span>
                     </button>

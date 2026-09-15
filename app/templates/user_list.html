@@ -28,8 +28,8 @@
 
 {% include "_invite_panel.html" %}
 
-<div class="add-form">
-    <h6 style="color: var(--text-secondary); margin-bottom: 12px;">新規ユーザー追加</h6>
+<div class="ui-card add-form">
+    <h5 class="ui-card-title">新規ユーザー追加</h5>
     <div class="add-form-hint" style="margin:-6px 0 10px;">プロジェクトのメンバー追加・役割変更は各プロジェクトの「メンバー管理」で行います。ここでは全ユーザーのアカウント自体（有効/無効・システム管理者権限・パスワード・Google 連携）を管理します。</div>
     <form method="post" action="{{ PREFIX }}/admin/users/create" id="add-user-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -77,7 +77,7 @@
                         <input type="checkbox" class="form-check-input" name="is_superuser" value="true" id="is_superuser">
                         <label class="form-check-label" for="is_superuser" title="全プロジェクトの管理・プロジェクトの作成削除・全ユーザー管理ができる">システム管理者</label>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm">追加</button>
+                    <button type="submit" class="btn-accent sm">追加</button>
                 </div>
             </div>
         </div>
@@ -86,7 +86,8 @@
     </form>
 </div>
 
-<table class="dark-table">
+<div class="ui-table-wrap">
+<table class="ui-table dark-table">
     <thead>
         <tr>
             <th>ID</th>
@@ -97,7 +98,7 @@
             <th>所属プロジェクト</th>
             <th>状態</th>
             <th>操作</th>
-            <th style="text-align:right; border-left:none;"></th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -128,14 +129,14 @@
             </td>
             <td>
                 {% if u.is_invite_pending %}
-                <span class="badge-pending" title="本人が招待リンクから Google でログインすると有効になります">招待中</span>
-                {% elif u.is_active %}<span class="badge-active">有効</span>{% else %}<span class="badge-inactive">無効</span>{% endif %}
+                <span class="pill pending" title="本人が招待リンクから Google でログインすると有効になります">招待中</span>
+                {% elif u.is_active %}<span class="pill on">有効</span>{% else %}<span class="pill off">無効</span>{% endif %}
             </td>
             <td>
                 {% if u.username != user %}
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <div class="role-dropdown" style="display:inline-block; position:relative;">
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleRoleMenu(this)">権限変更</button>
+                        <button type="button" class="btn-ghost primary" onclick="toggleRoleMenu(this)">権限変更</button>
                         <div class="role-menu">
                             {% if u.is_superuser %}
                             <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
@@ -156,43 +157,43 @@
                     </div>
                     <form method="post" action="{{ PREFIX }}/admin/users/toggle/{{ u.id }}" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn {% if u.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %} btn-sm">
+                        <button type="submit" class="btn-ghost {% if u.is_active %}warning{% else %}success{% endif %}">
                             {% if u.is_active %}無効化{% else %}有効化{% endif %}
                         </button>
                     </form>
-                    <button type="button" class="btn btn-outline-info btn-sm" style="white-space:nowrap;" onclick="togglePanel(this, '.pw-reset-panel')">{% if u.has_password %}PW変更{% else %}PW設定{% endif %}</button>
-                    <button type="button" class="btn btn-outline-info btn-sm" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
+                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="togglePanel(this, '.pw-reset-panel')">{% if u.has_password %}PW変更{% else %}PW設定{% endif %}</button>
+                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
                     {% if u.has_google and not u.google_sub %}
                     <form method="post" action="{{ PREFIX }}/admin/users/reinvite/{{ u.id }}" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn btn-outline-info btn-sm" style="white-space:nowrap;">招待リンク再発行</button>
+                        <button type="submit" class="btn-ghost" style="white-space:nowrap;">招待リンク再発行</button>
                     </form>
                     {% endif %}
                     <form method="post" action="{{ PREFIX }}/admin/users/delete/{{ u.id }}" style="display:inline;" data-username="{{ u.username }}" onsubmit="return confirm('ユーザー「' + this.dataset.username + '」を削除しますか？')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">削除</button>
+                        <button type="submit" class="btn-ghost danger">削除</button>
                     </form>
                 </div>
                 <form method="post" action="{{ PREFIX }}/admin/users/reset_password/{{ u.id }}" class="inline-panel pw-reset-panel">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="password" name="new_password" class="form-control form-control-sm reset-pw-input" placeholder="新しいパスワード" required minlength="4" oninput="updatePwBtn(this)">
-                    <button type="submit" class="btn btn-info btn-sm" style="white-space:nowrap;" disabled>適用</button>
-                    <button type="button" class="btn btn-outline-neutral btn-sm" style="white-space:nowrap;" onclick="closeAllPanels()">キャンセル</button>
+                    <button type="submit" class="btn-accent sm" style="white-space:nowrap;" disabled>適用</button>
+                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="closeAllPanels()">キャンセル</button>
                 </form>
                 {% else %}
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <span style="color:var(--text-secondary); font-size:12px;">(自分)</span>
-                    <button type="button" class="btn btn-outline-info btn-sm" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
+                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
                 </div>
                 {% endif %}
                 <form method="post" action="{{ PREFIX }}/admin/users/set_email/{{ u.id }}" class="inline-panel google-panel" data-username="{{ u.username }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="email" name="email" class="form-control form-control-sm google-email-input" value="{{ u.email or '' }}" placeholder="user@gmail.com" autocomplete="off"{% if not GOOGLE_ENABLED %} disabled title="Google ログインが未設定です"{% endif %}>
-                    <button type="submit" class="btn btn-info btn-sm" style="white-space:nowrap;"{% if not GOOGLE_ENABLED %} disabled{% endif %}>{% if u.has_google %}変更{% else %}招待{% endif %}</button>
+                    <button type="submit" class="btn-accent sm" style="white-space:nowrap;"{% if not GOOGLE_ENABLED %} disabled{% endif %}>{% if u.has_google %}変更{% else %}招待{% endif %}</button>
                     {% if u.has_google %}
-                    <button type="submit" class="btn btn-outline-danger btn-sm" style="white-space:nowrap;" onclick="return unlinkGoogle(this)">解除</button>
+                    <button type="submit" class="btn-ghost danger" style="white-space:nowrap;" onclick="return unlinkGoogle(this)">解除</button>
                     {% endif %}
-                    <button type="button" class="btn btn-outline-neutral btn-sm" style="white-space:nowrap;" onclick="closeAllPanels()">キャンセル</button>
+                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="closeAllPanels()">キャンセル</button>
                 </form>
             </td>
             <td class="user-timestamps">
@@ -203,6 +204,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endblock %}
 
 {% block extra_js %}

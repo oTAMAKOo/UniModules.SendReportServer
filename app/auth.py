@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import AdminUser, ApiToken, SystemConfig
+from app.models import ROLE_ADMIN, AdminUser, ApiToken, Project, ProjectMember, SystemConfig
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,12 @@ def check_credentials(db: Session, username: str, password: str) -> AdminUser | 
 
 
 def ensure_default_admin(db: Session):
-    """初回起動時にデフォルト管理者がいなければ作成する。"""
+    """初回起動時にデフォルト管理者がいなければ作成する。
+
+    新規環境ではマイグレーション 007 が先に最初のプロジェクトを作っており、その時点ではユーザーが
+    いないためメンバーが空になる。superuser は所属が無くても全プロジェクトを管理できるが、
+    メンバー一覧に誰もいないのは分かりにくいので、既存の全プロジェクトに管理者として所属させる。
+    """
     if db.query(AdminUser).count() == 0:
         admin = AdminUser(
             username=settings.admin_username,
@@ -134,6 +139,9 @@ def ensure_default_admin(db: Session):
             is_superuser=True,
         )
         db.add(admin)
+        db.flush()
+        for project in db.query(Project).all():
+            db.add(ProjectMember(project_id=project.id, user_id=admin.id, role=ROLE_ADMIN))
         try:
             db.commit()
         except IntegrityError:

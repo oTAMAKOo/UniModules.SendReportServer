@@ -112,10 +112,14 @@
     }
 
     /* Report list card */
+    .list-header { flex-wrap: wrap; }
+    .list-header h2 { white-space: normal; }
+    .search-bar .btn-accent { padding: 6px 14px; }
+    .search-bar .btn-ghost { padding: 6px 12px; font-size: 13px; }
     .report-list-card {
         background: var(--bg-card);
         border: 1px solid var(--border-card);
-        border-radius: 8px;
+        border-radius: 12px;
         box-shadow: var(--shadow-card);
         overflow: hidden;
     }
@@ -242,7 +246,7 @@
 <div class="alert alert-warning" style="font-size:14px;">{{ error }}</div>
 {% endif %}
 <div class="list-header">
-    <h2>{{ project.name }} <span style="color:var(--text-secondary); font-size:14px; font-weight:400;">レポート一覧</span></h2>
+    <h2>{{ project.name }}<small style="color:var(--text-secondary); font-size:13px; font-weight:400; margin-left:10px;">レポート一覧 · {{ total }} 件{% if q or date_from or date_to %}（フィルタ適用中）{% endif %}</small></h2>
     <form method="get" action="{{ project_url(project.slug, '/list') }}" class="search-bar">
         <div class="search-input-wrap">
             <img src="/static/icons/d_search.png" alt="" class="search-icon-img">
@@ -251,12 +255,10 @@
         <input type="date" class="date-input" name="date_from" value="{{ date_from }}">
         <span class="sep">~</span>
         <input type="date" class="date-input" name="date_to" value="{{ date_to }}">
-        <button type="submit" class="btn-search">検索</button>
-        {% if q or date_from or date_to %}<a href="{{ project_url(project.slug, '/list') }}" class="btn-clear">クリア</a>{% endif %}
+        <button type="submit" class="btn-accent">検索</button>
+        {% if q or date_from or date_to %}<a href="{{ project_url(project.slug, '/list') }}" class="btn-ghost">クリア</a>{% endif %}
     </form>
 </div>
-
-<div class="result-info">{{ total }} 件{% if q or date_from or date_to %} &mdash; フィルタ適用中{% endif %}</div>
 
 {% set filter_params = "" %}
 {% if q %}{% set filter_params = filter_params ~ "&q=" ~ q %}{% endif %}

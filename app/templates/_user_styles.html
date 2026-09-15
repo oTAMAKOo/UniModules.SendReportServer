@@ -1,45 +1,24 @@
 {# ユーザー一覧 / メンバー一覧で共通のスタイル #}
 <style>
     .container { max-width: 95vw; }
-    .dark-table {
-        width: 100%;
-        border-collapse: collapse;
+    .add-form { margin-bottom: 18px; }
+    .add-form > form, .add-form > .ui-card-title, .add-form > .add-form-hint { margin-left: 20px; margin-right: 20px; }
+    .add-form > .ui-card-title { margin-top: 18px; }
+    .add-form > form:last-child, .add-form > .add-form-hint:last-child { margin-bottom: 16px; }
+    .add-form .form-control, .add-form .form-select {
+        background: var(--bg-input);
+        border: 1px solid var(--border-input);
         color: var(--text-primary);
-        font-size: 14px;
+        font-size: 13px;
+        border-radius: 6px;
     }
-    .dark-table th {
-        background-color: var(--bg-table-th);
-        color: var(--text-secondary);
-        border: 1px solid var(--border-color);
-        padding: 8px 12px;
-        font-weight: normal;
-        white-space: nowrap;
-    }
-    .dark-table td {
-        background-color: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        padding: 8px 12px;
-        vertical-align: middle;
-    }
-    .add-form {
-        background: var(--bg-table-td);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 20px;
-    }
-    .add-form .form-control {
-        background: var(--bg-log-odd);
-        border-color: var(--border-color);
+    .add-form .form-control:focus, .add-form .form-select:focus {
+        background: var(--bg-input);
         color: var(--text-primary);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(88,166,255,0.2);
     }
-    .add-form .form-control:focus {
-        background: var(--bg-log-odd);
-        color: var(--text-primary);
-        border-color: #5a9fd4;
-        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
-    }
-    .add-form .form-label { color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; display: block; }
+    .add-form .form-label { display: block; color: var(--text-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 5px; }
     .add-form .form-check-label { color: var(--text-secondary); font-size: 13px; }
     .add-form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
     .add-form-field { width: 200px; }
@@ -75,15 +54,6 @@
     .login-method-option input { margin: 0; cursor: pointer; }
     .login-method-option.disabled { color: var(--text-secondary); cursor: not-allowed; }
     .login-method-option.disabled input { cursor: not-allowed; }
-    /* 役割バッジ。色は全画面で固定: システム管理者 = 紫、プロジェクト管理者 = 金、メンバー = 灰 */
-    .badge-sysadmin { background: #4b3a6b; color: #d9c8f5; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
-    .badge-projadmin { background: #d4a017; color: #000; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
-    .badge-member { background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-super { background: #d4a017; color: #000; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
-    .badge-general { background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-active { background: #238636; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-inactive { background: #6e4040; color: #f85149; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-    .badge-pending { background: #4a4520; color: #e3c95a; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
     .badge-method { display: inline-block; background: #3d4450; color: #c9d1d9; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; margin: 1px 0; }
     .badge-method.badge-google { background: #1f4f8a; color: #cfe3ff; }
     .badge-method.badge-google.pending { background: #4a4520; color: #e3c95a; }
@@ -98,30 +68,8 @@
         color: #888;
         white-space: nowrap;
         text-align: right;
-        border-left: none !important;
     }
     .user-timestamps div { line-height: 1.6; }
-    .btn-sm { font-size: 12px; padding: 2px 10px; }
-    /* 補助操作（キャンセル・コピー）用の中立色。Bootstrap の outline-secondary は
-       ダークテーマ上で無効ボタンに見えるため、テーマ変数ベースで枠線をはっきりさせる */
-    .btn-outline-neutral {
-        color: var(--text-primary);
-        border: 1px solid var(--text-secondary);
-        background: transparent;
-    }
-    .btn-outline-neutral:hover {
-        color: var(--text-primary);
-        background: var(--bg-card-hover);
-        border-color: var(--text-primary);
-    }
-    /* Bootstrap の success 緑はダーク背景では沈んで見えるため、ダークテーマだけ明るい緑に */
-    [data-theme="dark"] .btn-outline-success {
-        --bs-btn-color: #3fb950;
-        --bs-btn-border-color: #3fb950;
-        --bs-btn-hover-bg: #3fb950;
-        --bs-btn-hover-border-color: #3fb950;
-        --bs-btn-hover-color: #000;
-    }
     .alert { font-size: 14px; }
     .reset-pw-input { width: 140px; display: inline-block; }
     .pw-field-wrapper {
@@ -149,10 +97,10 @@
         top: 100%;
         left: 0;
         margin-top: 4px;
-        background: var(--bg-table-td);
+        background: var(--bg-card);
         border: 1px solid var(--border-color);
-        border-radius: 6px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
         z-index: 10;
         min-width: 150px;
         padding: 4px 0;
@@ -185,15 +133,16 @@
     }
     .inline-panel.open { display: flex; }
     .inline-panel .form-control {
-        background: var(--bg-log-odd);
-        border-color: var(--border-color);
+        background: var(--bg-input);
+        border: 1px solid var(--border-input);
         color: var(--text-primary);
+        border-radius: 6px;
     }
     .inline-panel .form-control:focus {
-        background: var(--bg-log-odd);
+        background: var(--bg-input);
         color: var(--text-primary);
-        border-color: #5a9fd4;
-        box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(88,166,255,0.2);
     }
     .google-email-input { width: 230px; display: inline-block; }
     /* 招待リンクの表示 */

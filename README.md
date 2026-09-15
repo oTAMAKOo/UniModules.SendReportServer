@@ -91,6 +91,7 @@ AWS へのデプロイ手順は構成別に 3 種類ある。常時公開する�
 - [docs/aws_deploy_budget.md](docs/aws_deploy_budget.md) — EC2 低コスト構成（t4g.nano 等）
 - [docs/aws_deploy_standard.md](docs/aws_deploy_standard.md) — EC2 標準構成（t4g.micro 以上）
 - [docs/aws_deployment_guide.md](docs/aws_deployment_guide.md) — 構成の選び方と共通事項
+- [docs/aws_setup_handoff.md](docs/aws_setup_handoff.md) — AWS 側の作業（S3 / IAM / Lightsail / DNS）だけを別の担当者に依頼するときの手順書と引き渡し表
 
 更新手順（`git pull` → `up -d --build`）と、ファイルコピーで配置した環境を git 管理に切り替える手順は
 `aws_deploy_lightsail.md` の 12 章にある。

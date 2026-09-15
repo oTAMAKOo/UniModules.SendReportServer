@@ -45,16 +45,6 @@ function unlinkGoogle(btn) {
     btn.form.querySelector('input[name="email"]').value = '';
     return true;
 }
-function updateLoginMethod() {
-    var checked = document.querySelector('input[name="login_method"]:checked');
-    var isGoogle = checked && checked.value === 'google';
-    document.getElementById('add-field-password').hidden = isGoogle;
-    document.getElementById('add-field-email').hidden = !isGoogle;
-    document.getElementById('add-hint-password').hidden = isGoogle;
-    document.getElementById('add-hint-google').hidden = !isGoogle;
-    document.getElementById('add-email').required = isGoogle;
-}
-updateLoginMethod();
 function copyInviteUrl(btn) {
     var input = document.getElementById('invite-url');
     var done = function() {

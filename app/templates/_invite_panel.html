@@ -1,22 +1,36 @@
-{# 招待リンク発行結果（invite 変数）の表示 #}
+{# 招待リンク発行結果（invite 変数）の表示。メールを送れたときはリンクを折りたたみ、送れないときはリンクを主役にする #}
 {% if invite %}
 <div class="alert alert-success invite-panel">
-    <strong>{{ invite.username }}</strong>（{{ invite.email }}）への招待リンクを発行しました。
-    {% if invite.note %}<br>{{ invite.note }}{% endif %}
     {% if invite.mail_sent %}
-    招待メールを送信しました。届かない場合は以下のリンクを直接伝えてください。
-    {% elif invite.mail_error %}
-    <span class="text-danger">招待メールの送信に失敗しました（{{ invite.mail_error }}）。</span>以下のリンクを直接伝えてください。
+    <strong>{{ invite.email }}</strong> に招待メールを送りました（リンクの有効期限 {{ invite.expire_hours }} 時間）。
+    {% if invite.note %}<br>{{ invite.note }}{% endif %}
+    <details class="invite-details">
+        <summary>メールが届かない場合はリンクを直接伝える</summary>
+        <div class="invite-url-row">
+            <input type="text" class="form-control form-control-sm" id="invite-url" value="{{ invite.url }}" readonly onclick="this.select()">
+            <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="copyInviteUrl(this)">コピー</button>
+        </div>
+    </details>
     {% else %}
-    以下のリンクを本人に伝えてください。
+    <strong>{{ invite.email }}</strong> への招待リンクを発行しました。
+    {% if invite.note %}<br>{{ invite.note }}{% endif %}
+    {% if invite.mail_error %}
+    <br><span class="text-danger">招待メールの送信に失敗しました（{{ invite.mail_error }}）。</span>
     {% endif %}
+    以下のリンクを本人に伝えてください（有効期限 {{ invite.expire_hours }} 時間）。
     <div class="invite-url-row">
         <input type="text" class="form-control form-control-sm" id="invite-url" value="{{ invite.url }}" readonly onclick="this.select()">
-        <button type="button" class="btn btn-outline-neutral btn-sm" style="white-space:nowrap;" onclick="copyInviteUrl(this)">コピー</button>
+        <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="copyInviteUrl(this)">コピー</button>
     </div>
+    {% endif %}
     <div class="add-form-hint" style="margin-top:6px;">
-        有効期限 {{ invite.expire_hours }} 時間。本人が招待された Google アカウントでログインすると有効化されます。
-        期限が切れても、登録済みの Google アカウントならログイン画面の「Google でログイン」から入れます。
+        {% if invite.pending %}
+        本人がリンクを開くと有効化ページが表示され、{% if GOOGLE_ENABLED %}Google ログインか{% endif %}ユーザー名とパスワードの設定を選んで有効化できます。
+        期限が切れたら操作列の「招待を再発行」で新しいリンクを出せます。
+        {% else %}
+        本人がリンクから招待されたアドレスの Google アカウントでログインすると連携されます。
+        期限が切れても、ログイン画面の「Google でログイン」から同じように連携できます。
+        {% endif %}
     </div>
 </div>
 {% endif %}

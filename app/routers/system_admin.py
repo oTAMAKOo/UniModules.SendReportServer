@@ -18,6 +18,7 @@ from app.database import get_db
 from app.models import ROLE_ADMIN, ROLE_MEMBER, AdminUser, Project, ProjectMember, ReportData
 from app.routers.common import (
     check_and_create_emergency_admin,
+    create_invited_user,
     create_user,
     csrf_token_for,
     get_config_value,
@@ -190,31 +191,38 @@ async def user_list(request: Request, user: AdminUser = Depends(require_superuse
     return _users_page(request, user, db)
 
 
-@router.post("/admin/users/create", response_class=HTMLResponse)
-async def user_create(
+def _resolve_initial_project(db: Session, project_id: int) -> tuple[Project | None, str | None]:
+    """新規ユーザーの初期プロジェクト（任意）。0 なら無し。存在しない ID はエラー文。"""
+    if not project_id:
+        return None, None
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if project is None:
+        return None, "指定されたプロジェクトが存在しません"
+    return project, None
+
+
+@router.post("/admin/users/invite", response_class=HTMLResponse)
+async def user_invite(
     request: Request,
-    username: str = Form(...),
-    login_method: str = Form("password"),
-    password: str = Form(""),
-    email: str = Form(""),
+    email: str = Form(...),
     is_superuser: bool = Form(False),
     project_id: int = Form(0),
     csrf_token: str = Form(...),
     user: AdminUser = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
-    """ユーザーを作成する。project_id を指定するとそのプロジェクトのメンバーとしても追加する。"""
+    """メールアドレスで招待する。project_id を指定するとそのプロジェクトのメンバーとしても追加する。
+
+    本人が有効化ページで Google ログインかパスワード設定を選ぶ（ユーザー名も本人が決める）。
+    """
     if not verify_csrf(csrf_token, user):
         return redirect("/login")
 
-    project = db.query(Project).filter(Project.id == project_id).first() if project_id else None
-    if project_id and project is None:
-        return _users_page(request, user, db, error="指定されたプロジェクトが存在しません")
+    project, error = _resolve_initial_project(db, project_id)
+    if error:
+        return _users_page(request, user, db, error=error)
 
-    new_user, error = create_user(
-        db, username=username, login_method=login_method, password=password, email=email,
-        is_superuser=is_superuser, allow_reserved=True,
-    )
+    new_user, error = create_invited_user(db, email=email, is_superuser=is_superuser)
     if error:
         return _users_page(request, user, db, error=error)
 
@@ -222,9 +230,40 @@ async def user_create(
         db.add(ProjectMember(project_id=project.id, user_id=new_user.id, role=ROLE_MEMBER))
         db.commit()
 
-    if login_method == "google":
-        return _users_page(request, user, db, invite=await issue_invite(new_user))
-    return redirect("/admin/users")
+    return _users_page(request, user, db, invite=await issue_invite(new_user, inviter=user, project=project))
+
+
+@router.post("/admin/users/create", response_class=HTMLResponse)
+async def user_create(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(""),
+    is_superuser: bool = Form(False),
+    project_id: int = Form(0),
+    csrf_token: str = Form(...),
+    user: AdminUser = Depends(require_superuser),
+    db: Session = Depends(get_db),
+):
+    """パスワードを直接発行してユーザーを作る（緊急用。招待メールが使えない相手など）。
+
+    通常は user_invite を使う。ここで作ったユーザーには初回ログイン後にパスワードを変えてもらう。
+    """
+    if not verify_csrf(csrf_token, user):
+        return redirect("/login")
+
+    project, error = _resolve_initial_project(db, project_id)
+    if error:
+        return _users_page(request, user, db, error=error)
+
+    new_user, error = create_user(db, username=username, password=password, is_superuser=is_superuser, allow_reserved=True)
+    if error:
+        return _users_page(request, user, db, error=error)
+
+    if project is not None:
+        db.add(ProjectMember(project_id=project.id, user_id=new_user.id, role=ROLE_MEMBER))
+        db.commit()
+
+    return _users_page(request, user, db, message=f"'{new_user.username}' を作成しました。パスワードは本人に直接伝え、初回ログイン後に変更してもらってください")
 
 
 @router.post("/admin/users/delete/{user_id}")
@@ -372,6 +411,7 @@ async def user_set_email(
         return _users_page(request, user, db, invite=await issue_invite(
             target,
             note="既存の Google 連携を解除しました。本人がこのアドレスの Google アカウントでログインし直すと再連携されます",
+            inviter=user,
         ))
 
     if not target.has_password and is_last_active_superuser(db, target):
@@ -385,7 +425,7 @@ async def user_set_email(
     # 別アドレスの持ち主が連携し直せるよう、既存の Google 連携は解除する
     target.google_sub = None
     db.commit()
-    return _users_page(request, user, db, invite=await issue_invite(target))
+    return _users_page(request, user, db, invite=await issue_invite(target, inviter=user))
 
 
 @router.post("/admin/users/reinvite/{user_id}", response_class=HTMLResponse)
@@ -396,7 +436,10 @@ async def user_reinvite(
     user: AdminUser = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
-    """招待リンクを再発行する（有効期限切れ・メール不達時用）。"""
+    """招待リンクを再発行する（有効期限切れ・メール不達時用）。
+
+    対象は招待中のユーザーと、有効だが Google 未連携のユーザー。連携済みには発行しない。
+    """
     if not verify_csrf(csrf_token, user):
         return redirect("/login")
 
@@ -404,10 +447,10 @@ async def user_reinvite(
     if not target or not target.has_google or target.google_sub is not None:
         return redirect("/admin/users")
 
-    if not settings.google_enabled:
-        return _users_page(request, user, db, error="Google ログインが設定されていないため、招待リンクは発行できません")
+    if not target.is_invite_pending and not settings.google_enabled:
+        return _users_page(request, user, db, error="Google ログインが設定されていないため、Google 連携のリンクは発行できません")
 
-    return _users_page(request, user, db, invite=await issue_invite(target))
+    return _users_page(request, user, db, invite=await issue_invite(target, inviter=user))
 
 
 # --- System Config（全体共通: セッション有効期限） ---

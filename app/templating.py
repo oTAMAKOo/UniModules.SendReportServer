@@ -34,6 +34,8 @@ templates = Jinja2Templates(directory="app/templates", context_processors=[nav_c
 
 templates.env.globals["PREFIX"] = settings.url_prefix
 templates.env.globals["GOOGLE_ENABLED"] = settings.google_enabled
+# 招待メールを送るか（MAIL_MODE != none）。招待フォームの説明文の出し分けに使う
+templates.env.globals["MAIL_ENABLED"] = settings.mail_mode != "none"
 # 復旧用アカウント（ADMIN_GOOGLE_EMAIL）をユーザー一覧で見分けるために渡す
 templates.env.globals["ADMIN_GOOGLE_EMAIL"] = settings.admin_google_email
 templates.env.globals["project_url"] = project_url

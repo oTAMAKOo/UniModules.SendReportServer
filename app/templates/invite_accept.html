@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}アカウントの有効化 - Log Server{% endblock %}
+{% block extra_css %}
+<style>
+    .login-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: calc(100vh - 120px);
+    }
+    .login-card {
+        width: 100%;
+        max-width: 420px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-card);
+        border-radius: 12px;
+        box-shadow: var(--shadow-card);
+        padding: 32px;
+    }
+    .login-card h4 {
+        color: var(--text-primary);
+        font-size: 18px;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 6px;
+    }
+    .login-card .lead {
+        color: var(--text-secondary);
+        font-size: 13px;
+        text-align: center;
+        margin-bottom: 22px;
+        line-height: 1.6;
+    }
+    .login-card .lead strong { color: var(--text-primary); font-weight: 500; word-break: break-all; }
+    .login-card .alert { font-size: 13px; border-radius: 6px; }
+    .login-card .field .form-control { padding: 8px 12px; font-size: 14px; }
+    .pw-field-wrapper { position: relative; }
+    .pw-field-wrapper .form-control { padding-right: 36px; }
+    .pw-toggle-eye {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 2px;
+        line-height: 0;
+    }
+    .pw-toggle-eye:hover { color: var(--text-primary); }
+    .login-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 20px 0;
+        color: var(--text-secondary);
+        font-size: 12px;
+    }
+    .login-divider::before,
+    .login-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-input); }
+    .btn-google {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        padding: 9px;
+        border: 1px solid var(--border-input);
+        border-radius: 6px;
+        background: var(--bg-input);
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-google:hover { background: var(--bg-card-hover); border-color: var(--text-secondary); color: var(--text-primary); }
+    .btn-google svg { flex-shrink: 0; }
+    .option-title {
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+    .project-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: -8px 0 20px; }
+    .foot-note { color: var(--text-secondary); font-size: 11px; margin-top: 18px; line-height: 1.6; text-align: center; }
+    .foot-note a { color: var(--accent); }
+    .status-icon {
+        width: 44px; height: 44px; border-radius: 12px; margin: 0 auto 14px;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .status-icon.ok { background: rgba(35,134,54,0.18); color: #3fb950; }
+    .status-icon.warn { background: rgba(227,201,90,0.15); color: #e3c95a; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="login-wrap">
+    <div class="login-card">
+        {% if state == 'pending' %}
+        <h4>アカウントの有効化</h4>
+        <p class="lead">
+            <strong>{{ email }}</strong> として Log Server に招待されています。<br>
+            ログイン方法を選んでアカウントを有効化してください。
+        </p>
+        {% if project_names %}
+        <div class="project-chips">
+            {% for name in project_names %}<span class="chip">{{ name }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        {% if GOOGLE_ENABLED %}
+        <div class="option-title">Google アカウントで有効化</div>
+        <a class="btn-google" href="{{ PREFIX }}/invite/{{ token }}/google">
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            <span>Google でログインして有効化</span>
+        </a>
+        <div class="field"><div class="hint" style="margin-top:6px;">招待されたアドレス（{{ email }}）の Google アカウントを選んでください</div></div>
+        <div class="login-divider"><span>または</span></div>
+        {% endif %}
+
+        <div class="option-title">ユーザー名とパスワードを決めて有効化</div>
+        <form method="post" action="{{ PREFIX }}/invite/{{ token }}/activate" autocomplete="off">
+            <div class="field mb-3">
+                <label for="username">ユーザー名</label>
+                <input type="text" name="username" id="username" class="form-control" value="{{ username }}" required maxlength="64" autocomplete="username">
+                <div class="hint">ログインに使う名前。'@' は使えません。後から変更はできません</div>
+            </div>
+            <div class="field mb-3">
+                <label for="password">パスワード</label>
+                <div class="pw-field-wrapper">
+                    <input type="password" name="password" id="password" class="form-control" required minlength="6" autocomplete="new-password" placeholder="6 文字以上">
+                    <button type="button" class="pw-toggle-eye" onclick="togglePasswordVisibility(this)" tabindex="-1" title="パスワードを表示">
+                        <svg class="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="eye-off-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="field mb-3">
+                <label for="password_confirm">パスワード（確認）</label>
+                <input type="password" name="password_confirm" id="password_confirm" class="form-control" required minlength="6" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn-accent block">パスワードを設定して有効化</button>
+        </form>
+        <div class="foot-note">
+            このリンクの有効期限は {{ expire_hours }} 時間です。身に覚えのない招待なら、このページを閉じてください。
+        </div>
+
+        {% elif state == 'link_google' %}
+        <h4>Google アカウントの連携</h4>
+        <p class="lead">
+            このアカウントは既に有効です。<br>
+            <strong>{{ email }}</strong> の Google アカウントでログインすると連携され、以後 Google でもログインできます。
+        </p>
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+        {% if GOOGLE_ENABLED %}
+        <a class="btn-google" href="{{ PREFIX }}/invite/{{ token }}/google">
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            <span>Google でログインして連携</span>
+        </a>
+        {% else %}
+        <div class="alert alert-warning">Google ログインは現在無効になっています。管理者に連絡してください</div>
+        {% endif %}
+        <div class="foot-note"><a href="{{ PREFIX }}/login">ユーザー名とパスワードでログインする</a></div>
+
+        {% elif state == 'done' %}
+        <div class="status-icon ok">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h4>既に有効化されています</h4>
+        <p class="lead">このアカウントは有効化済みです。ログイン画面からログインしてください。</p>
+        <a class="btn-accent block" href="{{ PREFIX }}/login">ログイン画面へ</a>
+
+        {% elif state == 'blocked' %}
+        <div class="status-icon warn">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h4>有効化できません</h4>
+        <p class="lead">このアカウントは現在無効になっています。招待した管理者に連絡してください。</p>
+        <a class="btn-ghost" style="display:flex; justify-content:center; padding:8px;" href="{{ PREFIX }}/login">ログイン画面へ</a>
+
+        {% else %}
+        <div class="status-icon warn">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h4>招待リンクが無効です</h4>
+        <p class="lead">
+            リンクの有効期限（{{ expire_hours }} 時間）が切れているか、リンクが正しくありません。<br>
+            招待した管理者に再発行を依頼してください。
+        </p>
+        <a class="btn-ghost" style="display:flex; justify-content:center; padding:8px;" href="{{ PREFIX }}/login">ログイン画面へ</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function togglePasswordVisibility(btn) {
+    var input = btn.previousElementSibling;
+    var eyeIcon = btn.querySelector('.eye-icon');
+    var eyeOffIcon = btn.querySelector('.eye-off-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        eyeIcon.style.display = 'none';
+        eyeOffIcon.style.display = 'inline';
+    } else {
+        input.type = 'password';
+        eyeIcon.style.display = 'inline';
+        eyeOffIcon.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

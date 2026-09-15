@@ -1,4 +1,4 @@
-"""Google ログインと招待リンクのルート。
+"""Google ログインのルート。
 
 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL が揃っていないときは
 全ルートが 404 を返し、ログイン画面にも Google ボタンは表示されない。
@@ -6,6 +6,8 @@ GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL が揃っていない�
 Google ログインで AdminUser が新規作成されることはない。許可判定は
 「AdminUser.email に一致するレコードが既に在るか」のみで、初回ログイン時に
 行うのは google_sub の保存（と招待の受諾による有効化）だけ。
+招待リンク（/invite/{token}）の受け口は routers/invite.py。そこから「Google で有効化」を
+選ぶと start_google_auth(invite_email=...) でこのフローに入る。
 """
 import logging
 import secrets
@@ -24,7 +26,6 @@ from app.auth import (
     create_oauth_state,
     create_session_token,
     get_session_max_age,
-    verify_invite_token,
     verify_oauth_state,
 )
 from app.config import settings
@@ -54,8 +55,12 @@ def _login_error(request: Request, message: str) -> HTMLResponse:
     return response
 
 
-def _start_google_auth(invite_email: str | None = None) -> RedirectResponse:
-    """state / nonce を生成して署名付き Cookie に保存し、Google の認可画面へリダイレクトする。"""
+def start_google_auth(invite_email: str | None = None) -> RedirectResponse:
+    """state / nonce を生成して署名付き Cookie に保存し、Google の認可画面へリダイレクトする。
+
+    invite_email を渡すと（有効化ページからの遷移）、コールバックでそのアドレスと一致する
+    Google アカウントだけを受け付ける。
+    """
     state = secrets.token_urlsafe(32)
     nonce = secrets.token_urlsafe(32)
     payload = {"state": state, "nonce": nonce}
@@ -80,33 +85,7 @@ def _start_google_auth(invite_email: str | None = None) -> RedirectResponse:
 async def google_login(request: Request):
     _require_google_enabled()
     oauth_limiter.check(request)
-    return _start_google_auth()
-
-
-@router.get("/invite/{token}")
-async def invite_accept(token: str, request: Request, db: Session = Depends(get_db)):
-    """招待リンク。トークンを検証し、招待先アドレスをヒントにして Google 認証へ進める。
-
-    防衛線はリンクではなくコールバックでの email 照合なので、リンク自体は
-    使用済み管理をしない。有効期限切れでもログイン画面の Google ボタンから入れる。
-    """
-    if not settings.google_enabled:
-        # メール等で受け取ったリンクを開く人向けに、JSON の 404 ではなく画面で伝える
-        return _login_error(request, "Google ログインは現在無効になっています。管理者に連絡してください")
-    oauth_limiter.check(request)
-    payload = verify_invite_token(token)
-    if not payload:
-        return _login_error(request, "招待リンクが無効か、有効期限が切れています。管理者に再発行を依頼してください")
-
-    user = db.query(AdminUser).filter(AdminUser.id == payload.get("uid")).first()
-    if user is None or user.email is None or user.email != payload.get("email"):
-        return _login_error(request, "招待リンクが無効です。管理者に再発行を依頼してください")
-
-    if user.google_sub is not None:
-        # 既に連携済み。通常のログインへ
-        return redirect("/login")
-
-    return _start_google_auth(invite_email=user.email)
+    return start_google_auth()
 
 
 @router.get("/auth/google/callback")

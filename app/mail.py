@@ -25,23 +25,54 @@ def mail_enabled() -> bool:
     return settings.mail_mode != "none"
 
 
-def send_invite_mail(to_email: str, username: str, invite_url: str) -> None:
+def build_invite_mail(
+    to_email: str,
+    invite_url: str,
+    *,
+    inviter_name: str | None = None,
+    project_name: str | None = None,
+) -> tuple[str, str]:
+    """招待メールの (件名, 本文) を組み立てる。送信しない MAIL_MODE=none でも使える（テスト用）。"""
+    subject = "[Log Server] アカウントの招待"
+
+    who = f"{inviter_name} さんから" if inviter_name else "管理者から"
+    where = f"プロジェクト「{project_name}」への" if project_name else ""
+    lines = [
+        "Log Server（バグレポート管理画面）への招待",
+        "",
+        f"{who}{where}招待が届いています。",
+        "以下のリンクを開いて、アカウントを有効化してください。",
+        "",
+        invite_url,
+        "",
+        "有効化ページでは、次のどちらかでログイン方法を決められます。",
+    ]
+    if settings.google_enabled:
+        lines.append(f"  - このメールを受信した Google アカウント（{to_email}）でログインする")
+    lines += [
+        "  - ユーザー名とパスワードを自分で決める",
+        "",
+        f"リンクの有効期限は {settings.invite_expire_hours} 時間です。",
+        "期限が切れた場合は、招待した管理者に再発行を依頼してください。",
+        "",
+        "このメールに身に覚えがない場合は、何もせず削除してください。",
+        "リンクを開いても、このアドレス以外の Google アカウントでは有効化できません。",
+    ]
+    return subject, "\n".join(lines) + "\n"
+
+
+def send_invite_mail(
+    to_email: str,
+    invite_url: str,
+    *,
+    inviter_name: str | None = None,
+    project_name: str | None = None,
+) -> None:
     """招待メールを送る。MAIL_MODE=none なら何もしない。失敗時は MailError。"""
     if not mail_enabled():
         return
 
-    subject = "[Log Server] 管理画面への招待"
-    body = (
-        f"{username} さん\n"
-        f"\n"
-        f"Log Server の管理画面に招待されました。\n"
-        f"以下のリンクを開き、このメールを受信した Google アカウント（{to_email}）でログインしてください。\n"
-        f"\n"
-        f"{invite_url}\n"
-        f"\n"
-        f"リンクの有効期限は {settings.invite_expire_hours} 時間です。\n"
-        f"期限が切れた場合は管理者に再発行を依頼してください。\n"
-    )
+    subject, body = build_invite_mail(to_email, invite_url, inviter_name=inviter_name, project_name=project_name)
 
     try:
         if settings.mail_mode == "ses":
@@ -53,6 +84,7 @@ def send_invite_mail(to_email: str, username: str, invite_url: str) -> None:
     except Exception as e:
         logger.exception("招待メールの送信に失敗しました: to=%s", to_email)
         raise MailError(f"{type(e).__name__}: {e}") from e
+    logger.info("招待メールを送信しました: to=%s mode=%s", to_email, settings.mail_mode)
 
 
 def _send_ses(to_email: str, subject: str, body: str) -> None:

@@ -118,7 +118,11 @@ class AdminUser(Base):
 
     @property
     def is_invite_pending(self) -> bool:
-        """招待済みだが初回 Google ログイン待ちの状態（他のログイン手段も持たない）。"""
+        """招待済みだが本人の有効化待ちの状態（Google ログインもパスワードもまだ無い）。
+
+        有効化ページ（/invite/{token}）で本人が Google ログインかパスワード設定を選ぶと
+        is_active=True になる。明示カラムは無く、この組み合わせから推論する。
+        """
         return (
             self.email is not None
             and self.google_sub is None

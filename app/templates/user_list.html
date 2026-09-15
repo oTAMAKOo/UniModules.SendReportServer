@@ -13,6 +13,9 @@
 {% if error %}
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
+{% if message %}
+<div class="alert alert-success">{{ message }}</div>
+{% endif %}
 
 {% if emergency %}
 <div class="alert alert-warning" style="font-size:13px; border-radius:6px;">
@@ -29,41 +32,16 @@
 {% include "_invite_panel.html" %}
 
 <div class="ui-card add-form">
-    <h5 class="ui-card-title">新規ユーザー追加</h5>
+    <h5 class="ui-card-title">メールアドレスで招待</h5>
     <div class="add-form-hint" style="margin:-6px 0 10px;">プロジェクトのメンバー追加・役割変更は各プロジェクトの「メンバー管理」で行います。ここでは全ユーザーのアカウント自体（有効/無効・システム管理者権限・パスワード・Google 連携）を管理します。</div>
-    <form method="post" action="{{ PREFIX }}/admin/users/create" id="add-user-form">
+    <form method="post" action="{{ PREFIX }}/admin/users/invite" id="invite-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="add-form-row">
-            <div class="add-form-field">
-                <label class="form-label">ユーザー名</label>
-                <input type="text" class="form-control form-control-sm" name="username" required>
+            <div class="add-form-field" style="width:280px;">
+                <label class="form-label">メールアドレス</label>
+                <input type="email" class="form-control form-control-sm" name="email" required placeholder="user@example.com" autocomplete="off">
             </div>
-            <div class="add-form-field auto">
-                <label class="form-label">ログイン方法</label>
-                <div class="login-method-group">
-                    <label class="login-method-option">
-                        <input type="radio" name="login_method" value="password" checked onchange="updateLoginMethod()"> パスワード
-                    </label>
-                    <label class="login-method-option{% if not GOOGLE_ENABLED %} disabled{% endif %}"{% if not GOOGLE_ENABLED %} title="Google ログインが未設定です（.env の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / PUBLIC_BASE_URL）"{% endif %}>
-                        <input type="radio" name="login_method" value="google" onchange="updateLoginMethod()"{% if not GOOGLE_ENABLED %} disabled{% endif %}> Google
-                    </label>
-                </div>
-            </div>
-            <div class="add-form-field" id="add-field-password">
-                <label class="form-label">パスワード</label>
-                <div class="pw-field-wrapper">
-                    <input type="password" class="form-control form-control-sm" name="password" id="add-password" minlength="6" placeholder="6 文字以上">
-                    <button type="button" class="pw-toggle-eye" onclick="togglePasswordVisibility('add-password', this)" tabindex="-1" title="パスワードを表示">
-                        <svg class="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                        <svg class="eye-off-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    </button>
-                </div>
-            </div>
-            <div class="add-form-field" id="add-field-email" style="width:260px;" hidden>
-                <label class="form-label">Email（Google アカウント）</label>
-                <input type="email" class="form-control form-control-sm" name="email" id="add-email" placeholder="user@gmail.com" autocomplete="off">
-            </div>
-            <div class="add-form-field" style="width:180px;">
+            <div class="add-form-field" style="width:200px;">
                 <label class="form-label">初期プロジェクト（任意）</label>
                 <select class="form-select form-select-sm" name="project_id" style="background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);">
                     <option value="0">（なし）</option>
@@ -74,16 +52,58 @@
                 <label class="form-label">&nbsp;</label>
                 <div class="add-form-controls">
                     <div class="form-check">
-                        <input type="checkbox" class="form-check-input" name="is_superuser" value="true" id="is_superuser">
-                        <label class="form-check-label" for="is_superuser" title="全プロジェクトの管理・プロジェクトの作成削除・全ユーザー管理ができる">システム管理者</label>
+                        <input type="checkbox" class="form-check-input" name="is_superuser" value="true" id="invite_is_superuser">
+                        <label class="form-check-label" for="invite_is_superuser" title="全プロジェクトの管理・プロジェクトの作成削除・全ユーザー管理ができる">システム管理者</label>
                     </div>
-                    <button type="submit" class="btn-accent sm">追加</button>
+                    <button type="submit" class="btn-accent sm">招待する</button>
                 </div>
             </div>
         </div>
-        <div class="add-form-hint" id="add-hint-password">※ パスワードは 6 文字以上（必須）。本人に伝えたら初回ログイン後に変更してもらってください</div>
-        <div class="add-form-hint" id="add-hint-google" hidden>※ 招待リンクが発行されます。本人がリンクから上記の Google アカウントでログインすると有効になります</div>
+        <div class="add-form-hint">
+            ※ 招待リンク{% if MAIL_ENABLED %}をメールで送ります{% else %}が画面に表示されるので本人に伝えてください{% endif %}。
+            本人がリンクを開き、{% if GOOGLE_ENABLED %}Google ログインか{% endif %}ユーザー名とパスワードの設定を選ぶと有効になります。初期プロジェクトを選ぶとそのメンバーとして追加されます
+        </div>
     </form>
+    <details class="emergency-create">
+        <summary>パスワードを直接発行して作成（緊急用）</summary>
+        <form method="post" action="{{ PREFIX }}/admin/users/create" id="add-user-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="add-form-row">
+                <div class="add-form-field">
+                    <label class="form-label">ユーザー名</label>
+                    <input type="text" class="form-control form-control-sm" name="username" required maxlength="64">
+                </div>
+                <div class="add-form-field">
+                    <label class="form-label">パスワード</label>
+                    <div class="pw-field-wrapper">
+                        <input type="password" class="form-control form-control-sm" name="password" id="add-password" required minlength="6" placeholder="6 文字以上" autocomplete="new-password">
+                        <button type="button" class="pw-toggle-eye" onclick="togglePasswordVisibility('add-password', this)" tabindex="-1" title="パスワードを表示">
+                            <svg class="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="add-form-field" style="width:200px;">
+                    <label class="form-label">初期プロジェクト（任意）</label>
+                    <select class="form-select form-select-sm" name="project_id" style="background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);">
+                        <option value="0">（なし）</option>
+                        {% for p in projects %}<option value="{{ p.id }}">{{ p.name }} ({{ p.slug }})</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="add-form-field auto">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="add-form-controls">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="is_superuser" value="true" id="create_is_superuser">
+                            <label class="form-check-label" for="create_is_superuser">システム管理者</label>
+                        </div>
+                        <button type="submit" class="btn-ghost primary">作成</button>
+                    </div>
+                </div>
+            </div>
+            <div class="add-form-hint">※ メールが使えない相手や復旧用。パスワードは 6 文字以上で、本人に直接伝えて初回ログイン後に変更してもらってください</div>
+        </form>
+    </details>
 </div>
 
 <div class="ui-table-wrap">
@@ -108,11 +128,15 @@
             <td>{{ u.username }}</td>
             <td class="user-email">{{ u.email or '—' }}</td>
             <td>
+                {% if u.is_invite_pending %}
+                <span class="badge-method pending" title="本人が有効化ページでログイン方法を選ぶまで未定">未設定（招待中）</span>
+                {% else %}
                 {% if u.has_password %}<span class="badge-method">パスワード</span>{% endif %}
                 {% if u.has_google %}
-                <span class="badge-method badge-google{% if not u.google_sub %} pending{% endif %}" title="{% if u.google_sub %}Google アカウント連携済み{% else %}初回 Google ログイン待ち（リンクからログインすると連携されます）{% endif %}">Google{% if not u.google_sub %}（未連携）{% endif %}</span>
+                <span class="badge-method badge-google{% if not u.google_sub %} pending{% endif %}" title="{% if u.google_sub %}Google アカウント連携済み{% else %}初回 Google ログイン待ち（このアドレスの Google アカウントでログインすると連携されます）{% endif %}">Google{% if not u.google_sub %}（未連携）{% endif %}</span>
                 {% endif %}
                 {% if not u.has_password and not u.has_google %}<span style="color:var(--text-secondary);">—</span>{% endif %}
+                {% endif %}
             </td>
             <td>
                 {% if u.is_superuser %}<span class="badge-sysadmin" title="全プロジェクトを管理できる">システム管理者</span>{% else %}<span class="badge-member">一般</span>{% endif %}
@@ -129,7 +153,7 @@
             </td>
             <td>
                 {% if u.is_invite_pending %}
-                <span class="pill pending" title="本人が招待リンクから Google でログインすると有効になります">招待中</span>
+                <span class="pill pending" title="本人が招待リンクから有効化（Google ログインまたはパスワード設定）するまで待ち">招待中</span>
                 {% elif u.is_active %}<span class="pill on">有効</span>{% else %}<span class="pill off">無効</span>{% endif %}
             </td>
             <td>
@@ -166,7 +190,7 @@
                     {% if u.has_google and not u.google_sub %}
                     <form method="post" action="{{ PREFIX }}/admin/users/reinvite/{{ u.id }}" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn-ghost" style="white-space:nowrap;">招待リンク再発行</button>
+                        <button type="submit" class="btn-ghost" style="white-space:nowrap;" title="{% if u.is_invite_pending %}招待リンクを新しく発行{% if MAIL_ENABLED %}してメールを再送{% endif %}する{% else %}Google 連携用のリンクを再発行する{% endif %}">{% if u.is_invite_pending %}招待を再発行{% else %}連携リンク再発行{% endif %}</button>
                     </form>
                     {% endif %}
                     <form method="post" action="{{ PREFIX }}/admin/users/delete/{{ u.id }}" style="display:inline;" data-username="{{ u.username }}" onsubmit="return confirm('ユーザー「' + this.dataset.username + '」を削除しますか？')">

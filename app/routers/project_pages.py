@@ -27,7 +27,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import ROLE_ADMIN, ROLE_MEMBER, AdminUser, ProjectMember, ReportData
 from app.report_export import format_log, search_reports_query
-from app.routers.common import create_user, csrf_token_for, issue_invite, redirect, verify_csrf
+from app.routers.common import create_invited_user, csrf_token_for, issue_invite, redirect, verify_csrf
 from app.storage import delete_screenshot, get_image_url
 from app.templating import templates
 
@@ -291,30 +291,32 @@ async def member_add(
     return _members_page(request, ctx, db, message=f"'{identifier}' を追加しました")
 
 
-@router.post("/users/create", response_class=HTMLResponse)
-async def member_create(
+@router.post("/users/invite", response_class=HTMLResponse)
+async def member_invite(
     request: Request,
-    username: str = Form(...),
-    login_method: str = Form("password"),
-    password: str = Form(""),
-    email: str = Form(""),
+    email: str = Form(...),
+    role: str = Form(ROLE_MEMBER),
     csrf_token: str = Form(...),
     ctx: ProjectContext = AdminCtx,
     db: Session = Depends(get_db),
 ):
-    """新しいユーザーを作り、このプロジェクトのメンバーにする（Google なら招待リンクを発行）。"""
+    """メールアドレスで新しい人を招待し、このプロジェクトのメンバーにする。
+
+    招待中ユーザーを作って招待リンクを発行する（MAIL_MODE によりメール送信）。本人が有効化ページで
+    Google ログインかパスワード設定を選ぶと有効になる。ユーザー名やパスワードを管理者は決めない。
+    """
     if not verify_csrf(csrf_token, ctx.user):
         return redirect("/login")
+    if role not in (ROLE_ADMIN, ROLE_MEMBER):
+        return _members_page(request, ctx, db, error="役割の指定が不正です")
 
-    new_user, error = create_user(db, username=username, login_method=login_method, password=password, email=email)
+    new_user, error = create_invited_user(db, email=email)
     if error:
         return _members_page(request, ctx, db, error=error)
 
-    db.add(ProjectMember(project_id=ctx.project.id, user_id=new_user.id, role=ROLE_MEMBER))
+    db.add(ProjectMember(project_id=ctx.project.id, user_id=new_user.id, role=role))
     db.commit()
-    if login_method == "google":
-        return _members_page(request, ctx, db, invite=await issue_invite(new_user))
-    return _members_page(request, ctx, db, message=f"'{new_user.username}' を作成してメンバーに追加しました")
+    return _members_page(request, ctx, db, invite=await issue_invite(new_user, inviter=ctx.user, project=ctx.project))
 
 
 @router.post("/users/role/{user_id}")
@@ -377,7 +379,11 @@ async def member_reinvite(
     ctx: ProjectContext = AdminCtx,
     db: Session = Depends(get_db),
 ):
-    """メンバーの招待リンクを再発行する（有効期限切れ・メール不達時用）。"""
+    """メンバーの招待リンクを再発行する（有効期限切れ・メール不達時用）。
+
+    対象は招待中のユーザーと、有効だが Google 未連携（管理者が「Google連携」で email を付けた）のユーザー。
+    連携済みのユーザーには発行しない（リンクは単回利用ではないので、有効化済みへの再送は意味が無い）。
+    """
     if not verify_csrf(csrf_token, ctx.user):
         return redirect("/login")
 
@@ -385,10 +391,10 @@ async def member_reinvite(
     target = membership.user if membership else None
     if not target or not target.has_google or target.google_sub is not None:
         return _project_redirect(ctx, "/users")
-    if not settings.google_enabled:
-        return _members_page(request, ctx, db, error="Google ログインが設定されていないため、招待リンクは発行できません")
+    if not target.is_invite_pending and not settings.google_enabled:
+        return _members_page(request, ctx, db, error="Google ログインが設定されていないため、Google 連携のリンクは発行できません")
 
-    return _members_page(request, ctx, db, invite=await issue_invite(target))
+    return _members_page(request, ctx, db, invite=await issue_invite(target, inviter=ctx.user, project=ctx.project))
 
 
 # --- プロジェクト設定（AES Key/IV、プロジェクト管理者） ---

@@ -304,13 +304,21 @@ async def member_invite(
 
     招待中ユーザーを作って招待リンクを発行する（MAIL_MODE によりメール送信）。本人が有効化ページで
     Google ログインかパスワード設定を選ぶと有効になる。ユーザー名やパスワードを管理者は決めない。
+    role="sysadmin"（システム管理者として招待。このプロジェクトには管理者として所属）は操作者が
+    システム管理者のときだけ受け付ける。プロジェクト管理者が自分より強い権限を作れないようにするため。
     """
     if not verify_csrf(csrf_token, ctx.user):
         return redirect("/login")
-    if role not in (ROLE_ADMIN, ROLE_MEMBER):
+    is_superuser = False
+    if role == "sysadmin":
+        if not ctx.user.is_superuser:
+            return _members_page(request, ctx, db, error="システム管理者として招待できるのはシステム管理者だけです")
+        is_superuser = True
+        role = ROLE_ADMIN
+    elif role not in (ROLE_ADMIN, ROLE_MEMBER):
         return _members_page(request, ctx, db, error="役割の指定が不正です")
 
-    new_user, error = create_invited_user(db, email=email)
+    new_user, error = create_invited_user(db, email=email, is_superuser=is_superuser)
     if error:
         return _members_page(request, ctx, db, error=error)
 

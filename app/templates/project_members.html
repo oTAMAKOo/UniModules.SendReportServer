@@ -35,6 +35,9 @@
                 <select class="form-select form-select-sm role-select" name="role">
                     <option value="member" selected>メンバー</option>
                     <option value="admin">プロジェクト管理者</option>
+                    {% if current_user and current_user.is_superuser %}
+                    <option value="sysadmin">システム管理者</option>
+                    {% endif %}
                 </select>
             </div>
             <div class="add-form-field auto">
@@ -46,7 +49,8 @@
         </div>
         <div class="add-form-hint">
             ※ 招待リンク{% if MAIL_ENABLED %}をメールで送ります{% else %}が画面に表示されるので本人に伝えてください{% endif %}。
-            本人がリンクを開き、{% if GOOGLE_ENABLED %}Google ログインか{% endif %}ユーザー名とパスワードの設定を選ぶと有効になり、このプロジェクトのメンバーとして入れます
+            本人がリンクを開き、{% if GOOGLE_ENABLED %}Google ログインか{% endif %}ユーザー名とパスワードの設定を選ぶと有効になり、このプロジェクトのメンバーとして入れます{% if current_user and current_user.is_superuser %}。
+            <span class="badge-sysadmin">システム管理者</span> を選ぶと全プロジェクトを管理でき、このプロジェクトには管理者として所属します（システム管理者だけが選べます）{% endif %}
         </div>
     </form>
 </div>
@@ -95,7 +99,7 @@
         {% for m in members %}
         {% set u = m.user %}
         <tr>
-            <td>{{ u.username }}{% if u.is_superuser %} <span class="badge-sysadmin" title="システム管理者（所属に関係なく全プロジェクトを管理できる）">システム管理者</span>{% endif %}</td>
+            <td>{{ u.username }}</td>
             <td class="user-email">{{ u.email or '—' }}</td>
             <td>
                 {% if u.is_invite_pending %}
@@ -109,7 +113,10 @@
                 {% endif %}
             </td>
             <td>
-                {% if m.membership.role == 'admin' %}<span class="badge-projadmin">プロジェクト管理者</span>{% else %}<span class="badge-member">メンバー</span>{% endif %}
+                {% if u.is_superuser %}
+                <span class="badge-sysadmin" title="システム管理者（所属に関係なく全プロジェクトを管理できる）{% if m.membership.role != 'admin' %}。このプロジェクトの所属上の役割はメンバー{% endif %}">システム管理者</span>
+                {% if m.membership.role == 'admin' %}<span class="badge-projadmin">プロジェクト管理者</span>{% endif %}
+                {% elif m.membership.role == 'admin' %}<span class="badge-projadmin">プロジェクト管理者</span>{% else %}<span class="badge-member">メンバー</span>{% endif %}
             </td>
             <td>
                 {% if u.is_invite_pending %}

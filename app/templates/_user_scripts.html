@@ -33,6 +33,30 @@ function togglePanel(btn, selector) {
         if (input && !input.disabled) input.focus();
     }
 }
+function closeUserPanels() {
+    // 「⋯」で開いた管理パネル（行の直下の tr）を全部閉じ、入力欄を初期状態に戻す
+    document.querySelectorAll('.user-edit-row.open').forEach(function(row) {
+        row.classList.remove('open');
+        var main = row.previousElementSibling;
+        if (main) main.classList.remove('active');
+        row.querySelectorAll('input[name="new_password"]').forEach(function(pw) {
+            pw.value = '';
+            var submit = pw.closest('form').querySelector('button[type="submit"]');
+            if (submit) submit.disabled = true;
+        });
+        row.querySelectorAll('input[name="email"]').forEach(function(email) { email.value = email.defaultValue; });
+    });
+}
+function toggleUserPanel(btn) {
+    var main = btn.closest('tr');
+    var row = main.nextElementSibling;
+    var wasOpen = row.classList.contains('open');
+    closeUserPanels();
+    if (!wasOpen) {
+        row.classList.add('open');
+        main.classList.add('active');
+    }
+}
 function updatePwBtn(input) {
     var btn = input.closest('.pw-reset-panel').querySelector('button[type="submit"]');
     btn.disabled = input.value.length < 4;

@@ -126,7 +126,7 @@
             <th>権限</th>
             <th>所属プロジェクト</th>
             <th>状態</th>
-            <th>操作</th>
+            <th></th>
             <th></th>
         </tr>
     </thead>
@@ -171,73 +171,86 @@
                 <span class="pill pending" title="本人が招待リンクから有効化（Google ログインまたはパスワード設定）するまで待ち">招待中</span>
                 {% elif u.is_active %}<span class="pill on">有効</span>{% else %}<span class="pill off">無効</span>{% endif %}
             </td>
-            <td>
-                {% if u.username != user %}
-                <div class="d-flex gap-2 flex-wrap align-items-center">
-                    <div class="role-dropdown" style="display:inline-block; position:relative;">
-                        <button type="button" class="btn-ghost primary" onclick="toggleRoleMenu(this)">権限変更</button>
-                        <div class="role-menu">
-                            {% if u.is_superuser %}
-                            <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' のシステム管理者権限を外しますか？')">
-                                    <span class="badge-member" style="display:inline-block;">一般</span> に変更
-                                </button>
-                            </form>
-                            {% else %}
-                            <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit" class="role-menu-item" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' にシステム管理者権限を付与しますか？')">
-                                    <span class="badge-sysadmin" style="display:inline-block;">システム管理者</span> に変更
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <form method="post" action="{{ PREFIX }}/admin/users/toggle/{{ u.id }}" style="display:inline;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn-ghost {% if u.is_active %}warning{% else %}success{% endif %}">
-                            {% if u.is_active %}無効化{% else %}有効化{% endif %}
-                        </button>
-                    </form>
-                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="togglePanel(this, '.pw-reset-panel')">{% if u.has_password %}PW変更{% else %}PW設定{% endif %}</button>
-                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
-                    {% if u.has_google and not u.google_sub %}
-                    <form method="post" action="{{ PREFIX }}/admin/users/reinvite/{{ u.id }}" style="display:inline;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn-ghost" style="white-space:nowrap;" title="{% if u.is_invite_pending %}招待リンクを新しく発行{% if MAIL_ENABLED %}してメールを再送{% endif %}する{% else %}Google 連携用のリンクを再発行する{% endif %}">{% if u.is_invite_pending %}招待を再発行{% else %}連携リンク再発行{% endif %}</button>
-                    </form>
-                    {% endif %}
-                    <form method="post" action="{{ PREFIX }}/admin/users/delete/{{ u.id }}" style="display:inline;" data-username="{{ u.username }}" onsubmit="return confirm('ユーザー「' + this.dataset.username + '」を削除しますか？')">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn-ghost danger">削除</button>
-                    </form>
-                </div>
-                <form method="post" action="{{ PREFIX }}/admin/users/reset_password/{{ u.id }}" class="inline-panel pw-reset-panel">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="password" name="new_password" class="form-control form-control-sm reset-pw-input" placeholder="新しいパスワード" required minlength="4" oninput="updatePwBtn(this)">
-                    <button type="submit" class="btn-accent sm" style="white-space:nowrap;" disabled>適用</button>
-                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="closeAllPanels()">キャンセル</button>
-                </form>
-                {% else %}
-                <div class="d-flex gap-2 flex-wrap align-items-center">
-                    <span style="color:var(--text-secondary); font-size:12px;">(自分)</span>
-                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="togglePanel(this, '.google-panel')">Google連携</button>
-                </div>
-                {% endif %}
-                <form method="post" action="{{ PREFIX }}/admin/users/set_email/{{ u.id }}" class="inline-panel google-panel" data-username="{{ u.username }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="email" name="email" class="form-control form-control-sm google-email-input" value="{{ u.email or '' }}" placeholder="user@gmail.com" autocomplete="off"{% if not GOOGLE_ENABLED %} disabled title="Google ログインが未設定です"{% endif %}>
-                    <button type="submit" class="btn-accent sm" style="white-space:nowrap;"{% if not GOOGLE_ENABLED %} disabled{% endif %}>{% if u.has_google %}変更{% else %}招待{% endif %}</button>
-                    {% if u.has_google %}
-                    <button type="submit" class="btn-ghost danger" style="white-space:nowrap;" onclick="return unlinkGoogle(this)">解除</button>
-                    {% endif %}
-                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="closeAllPanels()">キャンセル</button>
-                </form>
-            </td>
             <td class="user-timestamps">
                 <div>作成: {{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
                 <div>最終ログイン: {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') if u.last_login_at else '—' }}</div>
+            </td>
+            <td class="user-more">
+                <button type="button" class="btn-more" onclick="toggleUserPanel(this)" title="このユーザーの管理操作を開く" aria-label="操作">⋯</button>
+            </td>
+        </tr>
+        {# 「⋯」で開く管理パネル（行の直下に展開） #}
+        <tr class="user-edit-row">
+            <td colspan="9">
+                <div class="user-edit-panel">
+                    {% if u.username != user %}
+                    <section class="user-edit-section">
+                        <div class="user-edit-label">権限</div>
+                        <div class="user-edit-controls">
+                            <form method="post" action="{{ PREFIX }}/admin/users/toggle_superuser/{{ u.id }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                {% if u.is_superuser %}
+                                <button type="submit" class="btn-ghost" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' のシステム管理者権限を外しますか？')">一般に変更</button>
+                                {% else %}
+                                <button type="submit" class="btn-ghost primary" data-username="{{ u.username }}" onclick="return confirm(this.dataset.username + ' にシステム管理者権限を付与しますか？')">システム管理者に変更</button>
+                                {% endif %}
+                            </form>
+                        </div>
+                    </section>
+                    <section class="user-edit-section">
+                        <div class="user-edit-label">状態</div>
+                        <div class="user-edit-controls">
+                            <form method="post" action="{{ PREFIX }}/admin/users/toggle/{{ u.id }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="btn-ghost {% if u.is_active %}warning{% else %}success{% endif %}">{% if u.is_active %}無効化{% else %}有効化{% endif %}</button>
+                            </form>
+                            {% if u.has_google and not u.google_sub %}
+                            <form method="post" action="{{ PREFIX }}/admin/users/reinvite/{{ u.id }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="btn-ghost" title="{% if u.is_invite_pending %}招待リンクを新しく発行{% if MAIL_ENABLED %}してメールを再送{% endif %}する{% else %}Google 連携用のリンクを再発行する{% endif %}">{% if u.is_invite_pending %}招待を再発行{% else %}連携リンク再発行{% endif %}</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </section>
+                    <section class="user-edit-section">
+                        <div class="user-edit-label">{% if u.has_password %}パスワード変更{% else %}パスワード設定{% endif %}</div>
+                        <div class="user-edit-controls">
+                            <form method="post" action="{{ PREFIX }}/admin/users/reset_password/{{ u.id }}" class="pw-reset-panel">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="password" name="new_password" class="form-control form-control-sm reset-pw-input" placeholder="新しいパスワード" required minlength="4" oninput="updatePwBtn(this)">
+                                <button type="submit" class="btn-accent sm" disabled>適用</button>
+                            </form>
+                        </div>
+                    </section>
+                    {% else %}
+                    <section class="user-edit-section">
+                        <div class="user-edit-label">権限 / 状態</div>
+                        <div class="user-edit-controls"><span class="ui-muted" style="font-size:12px;">自分のアカウントは変更できません</span></div>
+                    </section>
+                    {% endif %}
+                    <section class="user-edit-section">
+                        <div class="user-edit-label">Google 連携</div>
+                        <div class="user-edit-controls">
+                            <form method="post" action="{{ PREFIX }}/admin/users/set_email/{{ u.id }}" data-username="{{ u.username }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="email" name="email" class="form-control form-control-sm google-email-input" value="{{ u.email or '' }}" placeholder="user@gmail.com" autocomplete="off"{% if not GOOGLE_ENABLED %} disabled title="Google ログインが未設定です"{% endif %}>
+                                <button type="submit" class="btn-accent sm"{% if not GOOGLE_ENABLED %} disabled{% endif %}>{% if u.has_google %}変更{% else %}招待{% endif %}</button>
+                                {% if u.has_google %}
+                                <button type="submit" class="btn-ghost danger" onclick="return unlinkGoogle(this)">解除</button>
+                                {% endif %}
+                            </form>
+                        </div>
+                    </section>
+                    <div class="user-edit-tail">
+                        {% if u.username != user %}
+                        <form method="post" action="{{ PREFIX }}/admin/users/delete/{{ u.id }}" data-username="{{ u.username }}" onsubmit="return confirm('ユーザー「' + this.dataset.username + '」を削除しますか？')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn-ghost danger">ユーザーを削除</button>
+                        </form>
+                        {% endif %}
+                        <button type="button" class="btn-ghost" onclick="closeUserPanels()">閉じる</button>
+                    </div>
+                </div>
             </td>
         </tr>
         {% endfor %}

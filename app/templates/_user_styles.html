@@ -159,4 +159,45 @@
         box-shadow: none;
         border-color: rgba(0,0,0,0.3);
     }
+    /* 全ユーザー管理: 右端の「⋯」で行の直下に管理パネルを展開する */
+    .user-more { width: 1%; text-align: right; padding-left: 4px !important; }
+    .btn-more {
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-secondary);
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1;
+        padding: 2px 8px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .btn-more:hover, tr.active .btn-more { color: var(--text-primary); border-color: var(--border-color); background: var(--bg-card-hover); }
+    .ui-table tbody tr.active td { background: var(--bg-card-hover); border-bottom-color: transparent; }
+    .user-edit-row { display: none; }
+    .user-edit-row.open { display: table-row; }
+    .ui-table tbody tr.user-edit-row td, .ui-table tbody tr.user-edit-row:hover td {
+        background: var(--bg-body);
+        padding: 14px 20px 16px;
+        box-shadow: inset 0 1px 0 var(--border-color);
+    }
+    .user-edit-panel { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 40px; }
+    .user-edit-label { color: var(--text-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 8px; white-space: nowrap; }
+    .user-edit-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 30px; }
+    .user-edit-controls form { margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+    .user-edit-controls .form-control {
+        background: var(--bg-input);
+        border: 1px solid var(--border-input);
+        color: var(--text-primary);
+        border-radius: 6px;
+    }
+    .user-edit-controls .form-control:focus {
+        background: var(--bg-input);
+        color: var(--text-primary);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(88,166,255,0.2);
+    }
+    .user-edit-tail { margin-left: auto; align-self: flex-end; display: flex; align-items: center; gap: 6px; }
+    .user-edit-tail form { margin: 0; }
 </style>

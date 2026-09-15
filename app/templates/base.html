@@ -288,6 +288,8 @@
         pre.snippet { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-input); border-radius: 8px; padding: 12px 14px; font-size: 12px; margin: 8px 0 12px; white-space: pre-wrap; word-break: break-all; }
         .snippet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
         .snippet-head span { color: var(--text-secondary); font-size: 12px; }
+        /* ページ下端の余白（最後のカードが画面の底に張り付かないように） */
+        .page-container { padding-bottom: 48px; }
         .alert { font-size: 14px; border-radius: 8px; }
         code.inline { color: var(--text-primary); background: var(--bg-input); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
 
@@ -385,7 +387,7 @@
             </div>
         </div>
     </nav>
-    <div class="container">
+    <div class="container page-container">
         {% block content %}{% endblock %}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

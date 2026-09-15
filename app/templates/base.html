@@ -217,7 +217,7 @@
         .ui-section.first { margin-top: 0; }
         /* カード */
         .ui-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; box-shadow: var(--shadow-card); overflow: hidden; color: var(--text-primary); }
-        .ui-card + .ui-card { margin-top: 16px; }
+        :not(.ui-grid) > .ui-card + .ui-card { margin-top: 16px; }  /* 縦積みのときだけ。グリッド内は gap で間隔を取る */
         .ui-card-body { padding: 18px 20px; }
         .ui-card-title { color: var(--text-primary); font-size: 15px; font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .ui-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 20px; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.06); }

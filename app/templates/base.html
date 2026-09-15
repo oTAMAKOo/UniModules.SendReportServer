@@ -246,8 +246,18 @@
         .btn-ghost:disabled:hover { color: var(--text-secondary); border-color: var(--border-color); background: transparent; }
         /* 入力欄 */
         .field label, .field .form-label { display: block; color: var(--text-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 5px; }
-        .field .form-control, .field .form-select { background: var(--bg-input); border: 1px solid var(--border-input); color: var(--text-primary); font-size: 13px; border-radius: 6px; }
-        .field .form-control:focus, .field .form-select:focus { background: var(--bg-input); color: var(--text-primary); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.2); }
+        /* 選択欄の矢印: Bootstrap 既定は暗色でダークテーマだと見えないので差し替える。
+           背景は必ず background-color で指定する（background のショートハンドは矢印を消す） */
+        .form-select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238b949e' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m4 6.5 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 10px center;
+            background-size: 12px 12px;
+        }
+        [data-theme="light"] .form-select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2357606a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m4 6.5 4 4 4-4'/%3e%3c/svg%3e");
+        }
+        .field .form-control, .field .form-select { background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--text-primary); font-size: 13px; border-radius: 6px; }
+        .field .form-control:focus, .field .form-select:focus { background-color: var(--bg-input); color: var(--text-primary); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.2); }
         .field .form-control::placeholder { color: var(--text-secondary); opacity: 0.6; }
         .field .form-control[readonly] { color: var(--text-secondary); }
         .field .mono { font-family: Consolas, 'Courier New', monospace; }

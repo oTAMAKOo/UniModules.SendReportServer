@@ -6,14 +6,14 @@
     .add-form > .ui-card-title { margin-top: 18px; }
     .add-form > form:last-child, .add-form > .add-form-hint:last-child { margin-bottom: 16px; }
     .add-form .form-control, .add-form .form-select {
-        background: var(--bg-input);
+        background-color: var(--bg-input);
         border: 1px solid var(--border-input);
         color: var(--text-primary);
         font-size: 13px;
         border-radius: 6px;
     }
     .add-form .form-control:focus, .add-form .form-select:focus {
-        background: var(--bg-input);
+        background-color: var(--bg-input);
         color: var(--text-primary);
         border-color: var(--accent);
         box-shadow: 0 0 0 3px rgba(88,166,255,0.2);
@@ -66,15 +66,25 @@
     }
     .filter-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
     .filter-input:focus, .filter-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+    /* 矢印はブラウザ任せだと右端に余白が出ないので自前で描く */
     .filter-select {
-        padding: 6px 8px;
+        appearance: none;
+        -webkit-appearance: none;
+        padding: 6px 30px 6px 10px;
         font-size: 13px;
-        background: var(--bg-input);
+        background-color: var(--bg-input);
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238b949e' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m4 6.5 4 4 4-4'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 9px center;
+        background-size: 12px 12px;
         border: 1px solid var(--border-input);
         border-radius: 6px;
         color: var(--text-primary);
         outline: none;
-        max-width: 200px;
+        max-width: 220px;
+    }
+    [data-theme="light"] .filter-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2357606a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m4 6.5 4 4 4-4'/%3e%3c/svg%3e");
     }
     .user-filter-count { color: var(--text-secondary); font-size: 12px; margin-left: auto; white-space: nowrap; }
     .user-filter-empty td { color: var(--text-secondary); text-align: center; }

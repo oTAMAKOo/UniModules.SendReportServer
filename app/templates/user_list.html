@@ -42,7 +42,7 @@
             </div>
             <div class="add-form-field auto">
                 <label class="form-label">権限</label>
-                <select class="form-select form-select-sm" name="role" style="background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);">
+                <select class="form-select form-select-sm" name="role">
                     <option value="member" selected>一般</option>
                     <option value="admin">プロジェクト管理者</option>
                     <option value="sysadmin">システム管理者</option>
@@ -50,7 +50,7 @@
             </div>
             <div class="add-form-field" style="width:200px;">
                 <label class="form-label">初期プロジェクト</label>
-                <select class="form-select form-select-sm" name="project_id" style="background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);">
+                <select class="form-select form-select-sm" name="project_id">
                     <option value="0">（なし）</option>
                     {% for p in projects %}<option value="{{ p.id }}">{{ p.name }} ({{ p.slug }})</option>{% endfor %}
                 </select>
@@ -90,7 +90,7 @@
                 </div>
                 <div class="add-form-field auto">
                     <label class="form-label">権限</label>
-                    <select class="form-select form-select-sm" name="role" style="background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);">
+                    <select class="form-select form-select-sm" name="role">
                         <option value="member" selected>一般</option>
                         <option value="admin">プロジェクト管理者</option>
                         <option value="sysadmin">システム管理者</option>
@@ -98,7 +98,7 @@
                 </div>
                 <div class="add-form-field" style="width:200px;">
                     <label class="form-label">初期プロジェクト</label>
-                    <select class="form-select form-select-sm" name="project_id" style="background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);">
+                    <select class="form-select form-select-sm" name="project_id">
                         <option value="0">（なし）</option>
                         {% for p in projects %}<option value="{{ p.id }}">{{ p.name }} ({{ p.slug }})</option>{% endfor %}
                     </select>

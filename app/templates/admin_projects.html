@@ -2,31 +2,67 @@
 {% block title %}プロジェクト管理 - Log Server{% endblock %}
 {% block extra_css %}
 <style>
-    .container { max-width: 95vw; }
-    .dark-table { width: 100%; border-collapse: collapse; color: var(--text-primary); font-size: 14px; }
-    .dark-table th { background-color: var(--bg-table-th); color: var(--text-secondary); border: 1px solid var(--border-color); padding: 8px 12px; font-weight: normal; white-space: nowrap; }
-    .dark-table td { background-color: var(--bg-table-td); border: 1px solid var(--border-color); padding: 8px 12px; vertical-align: middle; }
-    .add-form { background: var(--bg-table-td); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-    .add-form .form-label { color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; display: block; }
-    .add-form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
-    .add-form-field { width: 200px; }
-    .add-form-field.wide { width: 320px; }
-    .add-form-hint { color: var(--text-secondary); font-size: 11px; margin-top: 8px; }
-    .dark-table .form-control, .add-form .form-control {
-        background: var(--bg-log-odd); border-color: var(--border-color); color: var(--text-primary);
-    }
-    .dark-table .form-control:focus, .add-form .form-control:focus {
-        background: var(--bg-log-odd); color: var(--text-primary); border-color: #5a9fd4; box-shadow: 0 0 0 0.2rem rgba(90,159,212,0.25);
-    }
-    .mono { font-family: Consolas, 'Courier New', monospace; }
-    .row-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .row-form .form-control-sm { width: 160px; }
-    .row-form .form-check-label { color: var(--text-secondary); font-size: 13px; }
-    .badge-active { background: #238636; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 4px; white-space: nowrap; }
-    .badge-inactive { background: #6e4040; color: #f85149; font-size: 11px; padding: 3px 10px; border-radius: 4px; white-space: nowrap; }
-    .btn-sm { font-size: 12px; padding: 2px 10px; }
+    .pm-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .pm-header h2 { color: var(--text-primary); font-size: 20px; font-weight: 600; margin: 0; }
+    .pm-header h2 small { color: var(--text-secondary); font-size: 13px; font-weight: 400; margin-left: 10px; }
     .alert { font-size: 14px; }
-    .link-list a { color: var(--accent); text-decoration: none; font-size: 12px; margin-right: 8px; }
+
+    /* ボタン（テーマ変数ベース。Bootstrap の outline は暗背景で沈むため） */
+    .btn-accent { background: var(--accent); border: 1px solid var(--accent); color: #fff; font-size: 13px; padding: 6px 14px; border-radius: 6px; font-weight: 500; }
+    .btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 12px; padding: 4px 10px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
+    .btn-ghost:hover { color: var(--text-primary); border-color: var(--text-secondary); background: var(--bg-card-hover); }
+    .btn-ghost.danger:hover { color: #f85149; border-color: #f85149; }
+    .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-ghost:disabled:hover { color: var(--text-secondary); border-color: var(--border-color); background: transparent; }
+
+    /* 作成フォーム（折りたたみ） */
+    .create-panel { display: none; background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; padding: 20px 22px; margin-bottom: 22px; box-shadow: var(--shadow-card); }
+    .create-panel.open { display: block; }
+    .create-panel h5 { color: var(--text-primary); font-size: 15px; font-weight: 600; margin: 0 0 14px; }
+    .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 18px; }
+    .field label { display: block; color: var(--text-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 5px; }
+    .field .form-control { background: var(--bg-input); border: 1px solid var(--border-input); color: var(--text-primary); font-size: 13px; border-radius: 6px; }
+    .field .form-control:focus { background: var(--bg-input); color: var(--text-primary); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.2); }
+    .field .form-control.mono { font-family: Consolas, 'Courier New', monospace; }
+    .field .hint { color: var(--text-secondary); font-size: 11px; margin-top: 4px; }
+    .field.wide { grid-column: span 2; }
+    .panel-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+    .panel-note { color: var(--text-secondary); font-size: 12px; }
+    .panel-note code { color: var(--text-primary); background: var(--bg-input); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+
+    /* プロジェクトカード */
+    .pm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+    .pm-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; box-shadow: var(--shadow-card); overflow: hidden; display: flex; flex-direction: column; }
+    .pm-card-body { padding: 18px 20px 14px; }
+    .pm-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .pm-card h5 { margin: 0; font-size: 17px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+    .pm-slug { display: inline-block; margin-top: 6px; color: var(--text-secondary); font-size: 12px; font-family: Consolas, 'Courier New', monospace; background: var(--bg-input); border: 1px solid var(--border-input); padding: 2px 8px; border-radius: 5px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+    .pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .pill.on { background: rgba(35,134,54,0.18); color: #3fb950; }
+    .pill.off { background: rgba(248,81,73,0.15); color: #f85149; }
+    .pm-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+    .stat { background: var(--bg-input); border: 1px solid var(--border-input); border-radius: 8px; padding: 8px 10px; }
+    .stat .v { color: var(--text-primary); font-size: 16px; font-weight: 600; line-height: 1.2; }
+    .stat .v small { color: var(--text-secondary); font-size: 11px; font-weight: 400; margin-left: 2px; }
+    .stat .k { color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+    .pm-links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+    .pm-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 20px; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.06); }
+    [data-theme="light"] .pm-card-foot { background: rgba(0,0,0,0.02); }
+    .pm-card-foot form { margin: 0; }
+
+    /* 編集パネル（カード内で開閉） */
+    .edit-panel { display: none; padding: 14px 20px 18px; border-top: 1px dashed var(--border-color); }
+    .edit-panel.open { display: block; }
+    .edit-panel .field-grid { grid-template-columns: 1fr 1fr; }
+    .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--text-secondary); font-size: 13px; }
+    .switch-row .form-check-input { width: 36px; height: 20px; cursor: pointer; }
+    .switch-row .form-check-input:checked { background-color: var(--accent); border-color: var(--accent); }
+    .edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+    .warn-text { color: #e3c95a; font-size: 11px; margin-top: 6px; }
+
+    .pm-empty { color: var(--text-secondary); padding: 48px; text-align: center; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: 12px; }
 </style>
 {% endblock %}
 {% block content %}
@@ -39,86 +75,131 @@
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 {% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
 
-<div class="add-form">
-    <h6 style="color: var(--text-secondary); margin-bottom: 12px;">新規プロジェクト</h6>
+<div class="pm-header">
+    <h2>プロジェクト<small>{{ rows | length }} 件</small></h2>
+    <button type="button" class="btn-accent" id="create-toggle" onclick="toggleCreate()">＋ 新規プロジェクト</button>
+</div>
+
+<div class="create-panel{% if error and not rows %} open{% endif %}" id="create-panel">
+    <h5>新規プロジェクト</h5>
     <form method="post" action="{{ PREFIX }}/admin/projects/create">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="add-form-row">
-            <div class="add-form-field">
-                <label class="form-label">slug（URL 用）</label>
+        <div class="field-grid">
+            <div class="field">
+                <label>slug（URL 用）</label>
                 <input type="text" class="form-control form-control-sm mono" name="slug" required pattern="[a-z0-9][a-z0-9-]{1,39}" placeholder="my-game" title="小文字英数字とハイフン、2〜40 文字">
+                <div class="hint">小文字英数字とハイフン、2〜40 文字。受信 URL と管理画面 URL に使う</div>
             </div>
-            <div class="add-form-field">
-                <label class="form-label">表示名</label>
+            <div class="field">
+                <label>表示名</label>
                 <input type="text" class="form-control form-control-sm" name="name" required maxlength="100" placeholder="My Game">
             </div>
-            <div class="add-form-field wide">
-                <label class="form-label">AES Key（32 文字）</label>
+            <div class="field wide">
+                <label>AES Key（32 文字）</label>
                 <input type="text" class="form-control form-control-sm mono" name="aes_key" value="{{ new_aes_key }}" required minlength="32" maxlength="32">
             </div>
-            <div class="add-form-field">
-                <label class="form-label">AES IV（16 文字）</label>
+            <div class="field">
+                <label>AES IV（16 文字）</label>
                 <input type="text" class="form-control form-control-sm mono" name="aes_iv" value="{{ new_aes_iv }}" required minlength="16" maxlength="16">
-            </div>
-            <div class="add-form-field" style="width:auto;">
-                <button type="submit" class="btn btn-primary btn-sm">作成</button>
+                <div class="hint">ランダム生成済み。Unity 側の鍵をこれに合わせるか、後で設定画面から変更</div>
             </div>
         </div>
-        <div class="add-form-hint">※ 受信 URL は <span class="mono">&lt;PUBLIC_BASE_URL&gt;{{ PREFIX }}/report/&lt;slug&gt;</span> になります。AES Key / IV はランダムに生成済みで、後からプロジェクト設定で変更できます。Unity クライアント側の鍵を同じ値にしてください</div>
+        <div class="panel-actions">
+            <div class="panel-note">受信 URL は <code>&lt;PUBLIC_BASE_URL&gt;{{ PREFIX }}/report/&lt;slug&gt;</code> になります</div>
+            <div style="display:flex; gap:8px;">
+                <button type="button" class="btn-ghost" onclick="toggleCreate()">キャンセル</button>
+                <button type="submit" class="btn-accent">作成</button>
+            </div>
+        </div>
     </form>
 </div>
 
-<table class="dark-table">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>slug / 表示名 / 受信</th>
-            <th>レポート</th>
-            <th>メンバー</th>
-            <th>作成日</th>
-            <th>リンク</th>
-            <th>操作</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for r in rows %}
-        <tr>
-            <td>{{ r.project.id }}</td>
-            <td>
-                <form method="post" action="{{ PREFIX }}/admin/projects/{{ r.project.id }}/update" class="row-form" data-slug="{{ r.project.slug }}" onsubmit="return confirmUpdate(this)">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="text" class="form-control form-control-sm mono" name="slug" value="{{ r.project.slug }}" required pattern="[a-z0-9][a-z0-9-]{1,39}" title="変更すると受信 URL と共有済みのリンクが壊れます">
-                    <input type="text" class="form-control form-control-sm" name="name" value="{{ r.project.name }}" required maxlength="100">
-                    <div class="form-check" style="margin:0;">
-                        <input type="checkbox" class="form-check-input" name="is_active" value="true" id="active-{{ r.project.id }}"{% if r.project.is_active %} checked{% endif %}>
-                        <label class="form-check-label" for="active-{{ r.project.id }}">受信を有効にする</label>
+{% if rows %}
+<div class="pm-grid">
+    {% for r in rows %}
+    <div class="pm-card" id="card-{{ r.project.id }}">
+        <div class="pm-card-body">
+            <div class="pm-card-top">
+                <div>
+                    <h5>{{ r.project.name }}</h5>
+                    <span class="pm-slug">{{ r.project.slug }}</span>
+                </div>
+                {% if r.project.is_active %}
+                <span class="pill on" title="POST {{ PREFIX }}/report/{{ r.project.slug }} を受け付けています">受信中</span>
+                {% else %}
+                <span class="pill off" title="受信 URL は 404 を返します（閲覧は可能）">受信停止</span>
+                {% endif %}
+            </div>
+            <div class="pm-stats">
+                <div class="stat"><div class="v">{{ r.report_count }}<small>件</small></div><div class="k">レポート</div></div>
+                <div class="stat"><div class="v">{{ r.member_count }}<small>人</small></div><div class="k">メンバー</div></div>
+                <div class="stat"><div class="v" style="font-size:13px; padding-top:2px;">{{ r.project.created_at.strftime('%Y-%m-%d') }}</div><div class="k">作成日</div></div>
+            </div>
+            <div class="pm-links">
+                <a class="btn-ghost" href="{{ project_url(r.project.slug, '/list') }}">レポート一覧</a>
+                <a class="btn-ghost" href="{{ project_url(r.project.slug, '/users') }}">メンバー管理</a>
+                <a class="btn-ghost" href="{{ project_url(r.project.slug, '/settings') }}">AES 設定</a>
+                <a class="btn-ghost" href="{{ project_url(r.project.slug, '/manage') }}">一括削除</a>
+            </div>
+        </div>
+        <div class="edit-panel" id="edit-{{ r.project.id }}">
+            <form method="post" action="{{ PREFIX }}/admin/projects/{{ r.project.id }}/update" data-slug="{{ r.project.slug }}" onsubmit="return confirmUpdate(this)">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="field-grid">
+                    <div class="field">
+                        <label>slug</label>
+                        <input type="text" class="form-control form-control-sm mono" name="slug" value="{{ r.project.slug }}" required pattern="[a-z0-9][a-z0-9-]{1,39}" title="小文字英数字とハイフン、2〜40 文字">
+                        <div class="warn-text">変更すると受信 URL と共有済みのリンクが変わります</div>
                     </div>
-                    <button type="submit" class="btn btn-outline-primary btn-sm">更新</button>
-                    {% if r.project.is_active %}<span class="badge-active">受信中</span>{% else %}<span class="badge-inactive">受信停止</span>{% endif %}
-                </form>
-            </td>
-            <td>{{ r.report_count }} 件</td>
-            <td>{{ r.member_count }} 人</td>
-            <td style="white-space:nowrap;">{{ r.project.created_at.strftime('%Y-%m-%d') }}</td>
-            <td class="link-list" style="white-space:nowrap;">
-                <a href="{{ project_url(r.project.slug, '/list') }}">一覧</a>
-                <a href="{{ project_url(r.project.slug, '/users') }}">メンバー</a>
-                <a href="{{ project_url(r.project.slug, '/settings') }}">設定</a>
-                <a href="{{ project_url(r.project.slug, '/manage') }}">一括削除</a>
-            </td>
-            <td>
-                <form method="post" action="{{ PREFIX }}/admin/projects/{{ r.project.id }}/delete" data-name="{{ r.project.name }}" onsubmit="return confirm('プロジェクト「' + this.dataset.name + '」を削除しますか？メンバーの所属も消えます（ユーザーアカウントは残ります）')">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit" class="btn btn-outline-danger btn-sm"{% if r.report_count %} disabled title="レポートが残っているため削除できません。先に一括削除してください"{% endif %}>削除</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+                    <div class="field">
+                        <label>表示名</label>
+                        <input type="text" class="form-control form-control-sm" name="name" value="{{ r.project.name }}" required maxlength="100">
+                    </div>
+                </div>
+                <div class="switch-row">
+                    <span>レポートの受信（<code style="font-size:11px;">POST {{ PREFIX }}/report/{{ r.project.slug }}</code>）</span>
+                    <input type="checkbox" class="form-check-input" role="switch" name="is_active" value="true"{% if r.project.is_active %} checked{% endif %}>
+                </div>
+                <div class="edit-actions">
+                    <button type="button" class="btn-ghost" onclick="toggleEdit({{ r.project.id }})">キャンセル</button>
+                    <button type="submit" class="btn-accent" style="padding:4px 14px; font-size:12px;">保存</button>
+                </div>
+            </form>
+        </div>
+        <div class="pm-card-foot">
+            <button type="button" class="btn-ghost" onclick="toggleEdit({{ r.project.id }})">編集</button>
+            <form method="post" action="{{ PREFIX }}/admin/projects/{{ r.project.id }}/delete" data-name="{{ r.project.name }}" onsubmit="return confirm('プロジェクト「' + this.dataset.name + '」を削除しますか？メンバーの所属も消えます（ユーザーアカウントは残ります）')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-ghost danger"{% if r.report_count %} disabled title="レポートが残っているため削除できません。先に一括削除してください"{% endif %}>削除</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="pm-empty">プロジェクトがありません。「新規プロジェクト」から作成してください。</div>
+{% endif %}
 {% endblock %}
 {% block extra_js %}
 <script>
+function toggleCreate() {
+    var p = document.getElementById('create-panel');
+    p.classList.toggle('open');
+    if (p.classList.contains('open')) {
+        var f = p.querySelector('input[name="slug"]');
+        if (f) f.focus();
+    }
+}
+function toggleEdit(id) {
+    var p = document.getElementById('edit-' + id);
+    var wasOpen = p.classList.contains('open');
+    document.querySelectorAll('.edit-panel.open').forEach(function(e) { e.classList.remove('open'); });
+    if (!wasOpen) {
+        p.classList.add('open');
+        var f = p.querySelector('input[name="name"]');
+        if (f) f.focus();
+    }
+}
 function confirmUpdate(form) {
     var newSlug = form.querySelector('input[name="slug"]').value;
     if (newSlug !== form.dataset.slug) {

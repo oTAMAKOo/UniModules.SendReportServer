@@ -191,34 +191,49 @@ async def user_list(request: Request, user: AdminUser = Depends(require_superuse
     return _users_page(request, user, db)
 
 
-def _resolve_initial_project(db: Session, project_id: int) -> tuple[Project | None, str | None]:
-    """新規ユーザーの初期プロジェクト（任意）。0 なら無し。存在しない ID はエラー文。"""
-    if not project_id:
-        return None, None
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if project is None:
-        return None, "指定されたプロジェクトが存在しません"
-    return project, None
+# 新規ユーザーの権限（招待 / 直接作成フォームの「権限」）。
+# システム管理者は AdminUser.is_superuser、プロジェクト管理者と一般は初期プロジェクトへの所属の役割で表す
+NEW_USER_ROLES = ("member", "admin", "sysadmin")
+
+
+def _resolve_new_user_role(db: Session, role: str, project_id: int) -> tuple[bool, Project | None, str | None, str | None]:
+    """権限と初期プロジェクトの組み合わせを検証し (is_superuser, project, membership_role, error) を返す。
+
+    - 一般（member）: 初期プロジェクトは任意。選べばメンバーとして所属
+    - プロジェクト管理者（admin）: 初期プロジェクトが必須。その管理者として所属
+    - システム管理者（sysadmin）: is_superuser。初期プロジェクトは任意で、選べば管理者として所属
+    """
+    if role not in NEW_USER_ROLES:
+        return False, None, None, "権限の指定が不正です"
+    project = None
+    if project_id:
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project is None:
+            return False, None, None, "指定されたプロジェクトが存在しません"
+    if role == "admin" and project is None:
+        return False, None, None, "プロジェクト管理者にするには初期プロジェクトを選んでください"
+    membership_role = ROLE_MEMBER if role == "member" else ROLE_ADMIN
+    return role == "sysadmin", project, membership_role, None
 
 
 @router.post("/admin/users/invite", response_class=HTMLResponse)
 async def user_invite(
     request: Request,
     email: str = Form(...),
-    is_superuser: bool = Form(False),
+    role: str = Form("member"),
     project_id: int = Form(0),
     csrf_token: str = Form(...),
     user: AdminUser = Depends(require_superuser),
     db: Session = Depends(get_db),
 ):
-    """メールアドレスで招待する。project_id を指定するとそのプロジェクトのメンバーとしても追加する。
+    """メールアドレスで招待する。権限（一般 / プロジェクト管理者 / システム管理者）と初期プロジェクトを指定できる。
 
     本人が有効化ページで Google ログインかパスワード設定を選ぶ（ユーザー名も本人が決める）。
     """
     if not verify_csrf(csrf_token, user):
         return redirect("/login")
 
-    project, error = _resolve_initial_project(db, project_id)
+    is_superuser, project, membership_role, error = _resolve_new_user_role(db, role, project_id)
     if error:
         return _users_page(request, user, db, error=error)
 
@@ -227,7 +242,7 @@ async def user_invite(
         return _users_page(request, user, db, error=error)
 
     if project is not None:
-        db.add(ProjectMember(project_id=project.id, user_id=new_user.id, role=ROLE_MEMBER))
+        db.add(ProjectMember(project_id=project.id, user_id=new_user.id, role=membership_role))
         db.commit()
 
     return _users_page(request, user, db, invite=await issue_invite(new_user, request=request, inviter=user, project=project))
@@ -238,7 +253,7 @@ async def user_create(
     request: Request,
     username: str = Form(...),
     password: str = Form(""),
-    is_superuser: bool = Form(False),
+    role: str = Form("member"),
     project_id: int = Form(0),
     csrf_token: str = Form(...),
     user: AdminUser = Depends(require_superuser),
@@ -251,7 +266,7 @@ async def user_create(
     if not verify_csrf(csrf_token, user):
         return redirect("/login")
 
-    project, error = _resolve_initial_project(db, project_id)
+    is_superuser, project, membership_role, error = _resolve_new_user_role(db, role, project_id)
     if error:
         return _users_page(request, user, db, error=error)
 
@@ -260,7 +275,7 @@ async def user_create(
         return _users_page(request, user, db, error=error)
 
     if project is not None:
-        db.add(ProjectMember(project_id=project.id, user_id=new_user.id, role=ROLE_MEMBER))
+        db.add(ProjectMember(project_id=project.id, user_id=new_user.id, role=membership_role))
         db.commit()
 
     return _users_page(request, user, db, message=f"'{new_user.username}' を作成しました。パスワードは本人に直接伝え、初回ログイン後に変更してもらってください")

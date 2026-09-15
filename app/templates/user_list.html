@@ -154,11 +154,17 @@
                 {% endif %}
             </td>
             <td class="user-projects">
-                {% for m in u.memberships|sort(attribute='project.name') %}
-                <a class="badge-project{% if m.role == 'admin' %} admin{% endif %}" href="{{ project_url(m.project.slug, '/users') }}" title="{{ m.project.name }}: {% if m.role == 'admin' %}プロジェクト管理者{% else %}メンバー{% endif %}">{{ m.project.slug }}{% if m.role == 'admin' %} ★{% endif %}</a>
+                {# 管理者としての所属を先に、同じ役割内は表示名順。4 件目以降は「+N」で展開 #}
+                {% set ms = u.memberships|sort(attribute='project.name')|sort(attribute='role') %}
+                {% set shown = 3 %}
+                {% for m in ms %}
+                <a class="badge-project{% if m.role == 'admin' %} admin{% endif %}{% if loop.index > shown %} extra{% endif %}" href="{{ project_url(m.project.slug, '/users') }}" title="{{ m.project.name }}: {% if m.role == 'admin' %}プロジェクト管理者{% else %}メンバー{% endif %}">{{ m.project.slug }}{% if m.role == 'admin' %} ★{% endif %}</a>
                 {% else %}
                 <span style="color:var(--text-secondary);">—</span>
                 {% endfor %}
+                {% if ms|length > shown %}
+                <button type="button" class="badge-project more" onclick="toggleProjects(this)" data-more="{{ ms|length - shown }}" title="残り {{ ms|length - shown }} 件を表示">+{{ ms|length - shown }}</button>
+                {% endif %}
             </td>
             <td>
                 {% if u.is_invite_pending %}

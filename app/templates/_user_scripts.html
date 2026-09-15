@@ -45,6 +45,12 @@ function unlinkGoogle(btn) {
     btn.form.querySelector('input[name="email"]').value = '';
     return true;
 }
+function toggleProjects(btn) {
+    // 所属プロジェクト列の 4 件目以降を行内で開閉する
+    var td = btn.closest('td');
+    var open = td.classList.toggle('expanded');
+    btn.textContent = open ? '閉じる' : '+' + btn.dataset.more;
+}
 function copyInviteUrl(btn) {
     var input = document.getElementById('invite-url');
     var done = function() {

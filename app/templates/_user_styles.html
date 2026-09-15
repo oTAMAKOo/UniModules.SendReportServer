@@ -49,8 +49,13 @@
     .badge-project:hover { background: #27507c; color: #cfe3ff; }
     .badge-project.admin { background: #5a4a17; color: #e3c95a; }
     .badge-project.admin:hover { background: #75611f; color: #f3dc7a; }
-    /* 所属プロジェクト列: プロジェクトが増えても他の列を押しのけず、バッジを折り返す */
-    .user-projects { max-width: 260px; white-space: normal; line-height: 1.9; }
+    /* 所属プロジェクト列: 先頭 3 件だけ見せ、残りは「+N」で行内展開する。展開時は折り返す */
+    .user-projects { min-width: 300px; max-width: 340px; white-space: nowrap; line-height: 1.9; }
+    .user-projects.expanded { white-space: normal; }
+    .user-projects .badge-project.extra { display: none; }
+    .user-projects.expanded .badge-project.extra { display: inline-block; }
+    .badge-project.more { background: transparent; color: var(--text-secondary); border: 1px dashed var(--border-color); cursor: pointer; line-height: inherit; }
+    .badge-project.more:hover { color: var(--text-primary); border-color: var(--text-secondary); background: var(--bg-card-hover); }
     .badge-recovery { background: #1f5a56; color: #a8e6df; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
     .user-email { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
     .user-timestamps {

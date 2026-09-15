@@ -22,33 +22,6 @@
 {% include "_invite_panel.html" %}
 
 <div class="ui-card add-form">
-    <h5 class="ui-card-title">既存ユーザーを追加</h5>
-    <form method="post" action="{{ project_url(project.slug, '/users/add') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="add-form-row">
-            <div class="add-form-field" style="width:260px;">
-                <label class="form-label">ユーザー名 または メールアドレス</label>
-                <input type="text" class="form-control form-control-sm" name="identifier" required placeholder="username / user@example.com" autocomplete="off">
-            </div>
-            <div class="add-form-field auto">
-                <label class="form-label">役割</label>
-                <select class="form-select form-select-sm role-select" name="role">
-                    <option value="member" selected>メンバー</option>
-                    <option value="admin">プロジェクト管理者</option>
-                </select>
-            </div>
-            <div class="add-form-field auto">
-                <label class="form-label">&nbsp;</label>
-                <div class="add-form-controls">
-                    <button type="submit" class="btn-accent sm">追加</button>
-                </div>
-            </div>
-        </div>
-        <div class="add-form-hint">※ 他のプロジェクトで既にアカウントを持っている人はこちら。アカウントが無い人は下から新規作成します</div>
-    </form>
-</div>
-
-<div class="ui-card add-form">
     <h5 class="ui-card-title">新規ユーザーを作成してメンバーに追加</h5>
     <form method="post" action="{{ project_url(project.slug, '/users/create') }}" id="add-user-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -91,6 +64,33 @@
         </div>
         <div class="add-form-hint" id="add-hint-password">※ パスワードは 6 文字以上（必須）。作成したユーザーはこのプロジェクトのメンバーになります</div>
         <div class="add-form-hint" id="add-hint-google" hidden>※ 招待リンクが発行されます。本人がリンクから上記の Google アカウントでログインすると有効になります</div>
+    </form>
+</div>
+
+<div class="ui-card add-form">
+    <h5 class="ui-card-title">既存ユーザーを追加</h5>
+    <form method="post" action="{{ project_url(project.slug, '/users/add') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="add-form-row">
+            <div class="add-form-field" style="width:260px;">
+                <label class="form-label">ユーザー名 または メールアドレス</label>
+                <input type="text" class="form-control form-control-sm" name="identifier" required placeholder="username / user@example.com" autocomplete="off">
+            </div>
+            <div class="add-form-field auto">
+                <label class="form-label">役割</label>
+                <select class="form-select form-select-sm role-select" name="role">
+                    <option value="member" selected>メンバー</option>
+                    <option value="admin">プロジェクト管理者</option>
+                </select>
+            </div>
+            <div class="add-form-field auto">
+                <label class="form-label">&nbsp;</label>
+                <div class="add-form-controls">
+                    <button type="submit" class="btn-accent sm">追加</button>
+                </div>
+            </div>
+        </div>
+        <div class="add-form-hint">※ 他のプロジェクトで既にアカウントを持っている人はこちら（新しい人は上のフォームで作成）</div>
     </form>
 </div>
 

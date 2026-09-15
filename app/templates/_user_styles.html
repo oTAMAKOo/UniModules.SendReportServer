@@ -49,6 +49,35 @@
     .badge-project:hover { background: #27507c; color: #cfe3ff; }
     .badge-project.admin { background: #5a4a17; color: #e3c95a; }
     .badge-project.admin:hover { background: #75611f; color: #f3dc7a; }
+    /* 一覧の絞り込みバー（ユーザー管理 / メンバー管理。すべてブラウザ側で絞る） */
+    .user-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .filter-input-wrap { position: relative; display: inline-flex; align-items: center; }
+    .filter-input-wrap .filter-icon { position: absolute; left: 10px; width: 14px; height: 14px; color: var(--text-secondary); opacity: 0.6; pointer-events: none; }
+    .filter-input {
+        width: 260px;
+        padding: 6px 10px 6px 32px;
+        font-size: 13px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-input);
+        border-radius: 6px;
+        color: var(--text-primary);
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .filter-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
+    .filter-input:focus, .filter-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+    .filter-select {
+        padding: 6px 8px;
+        font-size: 13px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-input);
+        border-radius: 6px;
+        color: var(--text-primary);
+        outline: none;
+        max-width: 200px;
+    }
+    .user-filter-count { color: var(--text-secondary); font-size: 12px; margin-left: auto; white-space: nowrap; }
+    .user-filter-empty td { color: var(--text-secondary); text-align: center; }
     /* 所属プロジェクト列: 一定幅で折り返して全件見せる（他の列を押しのけない） */
     .user-projects { max-width: 340px; white-space: normal; line-height: 1.9; }
     .badge-recovery { background: #1f5a56; color: #a8e6df; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; white-space: nowrap; }

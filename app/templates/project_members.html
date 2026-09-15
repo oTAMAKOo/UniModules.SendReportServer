@@ -82,8 +82,29 @@
     </form>
 </div>
 
+<div class="user-filter">
+    <span class="filter-input-wrap">
+        <svg class="filter-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14" stroke-linecap="round"/></svg>
+        <input type="text" class="filter-input" placeholder="ユーザー名 / メールで絞り込み" oninput="applyUserFilter()" autocomplete="off">
+    </span>
+    <select class="filter-select" data-filter-attr="roles" onchange="applyUserFilter()" title="役割で絞り込み">
+        <option value="">役割: すべて</option>
+        <option value="sysadmin">システム管理者</option>
+        <option value="projadmin">プロジェクト管理者</option>
+        <option value="member">メンバー</option>
+    </select>
+    <select class="filter-select" data-filter-attr="status" onchange="applyUserFilter()" title="状態で絞り込み">
+        <option value="">状態: すべて</option>
+        <option value="active">有効</option>
+        <option value="inactive">無効</option>
+        <option value="pending">招待中</option>
+    </select>
+    <button type="button" class="btn-ghost user-filter-clear" onclick="clearUserFilter()" hidden>クリア</button>
+    <span class="user-filter-count"></span>
+</div>
+
 <div class="ui-table-wrap">
-<table class="ui-table dark-table">
+<table class="ui-table dark-table user-table">
     <thead>
         <tr>
             <th>ユーザー名</th>
@@ -98,7 +119,11 @@
     <tbody>
         {% for m in members %}
         {% set u = m.user %}
-        <tr>
+        {# 絞り込み用の値（すべてブラウザ側で使う）。data-filter は小文字で連結した検索対象 #}
+        <tr class="user-row"
+            data-filter="{{ (u.username ~ ' ' ~ (u.email or ''))|lower }}"
+            data-roles="{% if m.membership.role == 'admin' %}projadmin{% else %}member{% endif %}{% if u.is_superuser %} sysadmin{% endif %}"
+            data-status="{% if u.is_invite_pending %}pending{% elif u.is_active %}active{% else %}inactive{% endif %}">
             <td>{{ u.username }}</td>
             <td class="user-email">{{ u.email or '—' }}</td>
             <td>
@@ -168,6 +193,7 @@
         {% else %}
         <tr><td colspan="7" style="color:var(--text-secondary); text-align:center;">メンバーがいません</td></tr>
         {% endfor %}
+        <tr class="user-filter-empty" hidden><td colspan="7">条件に合うメンバーがいません</td></tr>
     </tbody>
 </table>
 </div>

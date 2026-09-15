@@ -115,8 +115,36 @@
     </details>
 </div>
 
+<div class="user-filter">
+    <span class="filter-input-wrap">
+        <svg class="filter-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14" stroke-linecap="round"/></svg>
+        <input type="text" class="filter-input" placeholder="ユーザー名 / メール / プロジェクトで絞り込み" oninput="applyUserFilter()" autocomplete="off">
+    </span>
+    <select class="filter-select" data-filter-attr="projects" onchange="applyUserFilter()" title="所属プロジェクトで絞り込み">
+        <option value="">プロジェクト: すべて</option>
+        {% for p in projects %}
+        <option value="{{ p.slug }}">{{ p.name }}（{{ p.slug }}）</option>
+        {% endfor %}
+        <option value="-none-">所属なし</option>
+    </select>
+    <select class="filter-select" data-filter-attr="roles" onchange="applyUserFilter()" title="権限で絞り込み">
+        <option value="">権限: すべて</option>
+        <option value="sysadmin">システム管理者</option>
+        <option value="projadmin">プロジェクト管理者</option>
+        <option value="member">一般</option>
+    </select>
+    <select class="filter-select" data-filter-attr="status" onchange="applyUserFilter()" title="状態で絞り込み">
+        <option value="">状態: すべて</option>
+        <option value="active">有効</option>
+        <option value="inactive">無効</option>
+        <option value="pending">招待中</option>
+    </select>
+    <button type="button" class="btn-ghost user-filter-clear" onclick="clearUserFilter()" hidden>クリア</button>
+    <span class="user-filter-count"></span>
+</div>
+
 <div class="ui-table-wrap">
-<table class="ui-table dark-table">
+<table class="ui-table dark-table user-table">
     <thead>
         <tr>
             <th>ID</th>
@@ -132,7 +160,13 @@
     </thead>
     <tbody>
         {% for u in users %}
-        <tr>
+        {% set ums = u.memberships|sort(attribute='project.name')|sort(attribute='role') %}
+        {# 絞り込み用の値（すべてブラウザ側で使う）。data-filter は小文字で連結した検索対象 #}
+        <tr class="user-row"
+            data-filter="{{ (u.username ~ ' ' ~ (u.email or '') ~ ' ' ~ ums|map(attribute='project.slug')|join(' ') ~ ' ' ~ ums|map(attribute='project.name')|join(' '))|lower }}"
+            data-projects="{% if ums %}{{ ums|map(attribute='project.slug')|join(' ') }}{% else %}-none-{% endif %}"
+            data-roles="{% if u.is_superuser %}sysadmin{% else %}member{% endif %}{% if ums|selectattr('role', 'equalto', 'admin')|list %} projadmin{% endif %}"
+            data-status="{% if u.is_invite_pending %}pending{% elif u.is_active %}active{% else %}inactive{% endif %}">
             <td>{{ u.id }}</td>
             <td>{{ u.username }}</td>
             <td class="user-email">{{ u.email or '—' }}</td>
@@ -155,7 +189,7 @@
             </td>
             <td class="user-projects">
                 {# 管理者としての所属を先に、同じ役割内は表示名順。列幅に収まらなければ折り返して全件表示 #}
-                {% for m in u.memberships|sort(attribute='project.name')|sort(attribute='role') %}
+                {% for m in ums %}
                 <a class="badge-project{% if m.role == 'admin' %} admin{% endif %}" href="{{ project_url(m.project.slug, '/users') }}" title="{{ m.project.name }}: {% if m.role == 'admin' %}プロジェクト管理者{% else %}メンバー{% endif %}">{{ m.project.slug }}{% if m.role == 'admin' %} ★{% endif %}</a>
                 {% else %}
                 <span style="color:var(--text-secondary);">—</span>
@@ -249,6 +283,7 @@
             </td>
         </tr>
         {% endfor %}
+        <tr class="user-filter-empty" hidden><td colspan="9">条件に合うユーザーがいません</td></tr>
     </tbody>
 </table>
 </div>

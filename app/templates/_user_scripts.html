@@ -57,6 +57,50 @@ function toggleUserPanel(btn) {
         main.classList.add('active');
     }
 }
+// 一覧の絞り込み（サーバーへ問い合わせず、描画済みの行を隠すだけ）
+function applyUserFilter() {
+    var bar = document.querySelector('.user-filter');
+    var table = document.querySelector('.user-table');
+    if (!bar || !table) return;
+    var input = bar.querySelector('.filter-input');
+    var terms = (input.value || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+    var selects = Array.prototype.slice.call(bar.querySelectorAll('select[data-filter-attr]'));
+    var rows = table.querySelectorAll('tbody > tr.user-row');
+    var shown = 0;
+    Array.prototype.forEach.call(rows, function(tr) {
+        var hay = tr.dataset.filter || '';
+        var ok = terms.every(function(t) { return hay.indexOf(t) !== -1; });
+        if (ok) {
+            ok = selects.every(function(sel) {
+                if (!sel.value) return true;
+                return (tr.dataset[sel.dataset.filterAttr] || '').split(' ').indexOf(sel.value) !== -1;
+            });
+        }
+        tr.hidden = !ok;
+        var panel = tr.nextElementSibling;
+        if (panel && panel.classList.contains('user-edit-row')) {
+            if (!ok) panel.classList.remove('open');
+            panel.hidden = !ok;
+        }
+        if (ok) shown++;
+    });
+    var active = terms.length > 0 || selects.some(function(sel) { return !!sel.value; });
+    var empty = table.querySelector('.user-filter-empty');
+    if (empty) empty.hidden = shown > 0;
+    var count = bar.querySelector('.user-filter-count');
+    if (count) count.textContent = active ? shown + ' / ' + rows.length + ' 件' : rows.length + ' 件';
+    var clear = bar.querySelector('.user-filter-clear');
+    if (clear) clear.hidden = !active;
+}
+function clearUserFilter() {
+    var bar = document.querySelector('.user-filter');
+    if (!bar) return;
+    bar.querySelector('.filter-input').value = '';
+    bar.querySelectorAll('select[data-filter-attr]').forEach(function(sel) { sel.value = ''; });
+    applyUserFilter();
+    bar.querySelector('.filter-input').focus();
+}
+document.addEventListener('DOMContentLoaded', applyUserFilter);
 function updatePwBtn(input) {
     var btn = input.closest('.pw-reset-panel').querySelector('button[type="submit"]');
     btn.disabled = input.value.length < 4;

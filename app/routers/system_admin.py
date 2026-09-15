@@ -230,7 +230,7 @@ async def user_invite(
         db.add(ProjectMember(project_id=project.id, user_id=new_user.id, role=ROLE_MEMBER))
         db.commit()
 
-    return _users_page(request, user, db, invite=await issue_invite(new_user, inviter=user, project=project))
+    return _users_page(request, user, db, invite=await issue_invite(new_user, request=request, inviter=user, project=project))
 
 
 @router.post("/admin/users/create", response_class=HTMLResponse)
@@ -411,6 +411,7 @@ async def user_set_email(
         return _users_page(request, user, db, invite=await issue_invite(
             target,
             note="既存の Google 連携を解除しました。本人がこのアドレスの Google アカウントでログインし直すと再連携されます",
+            request=request,
             inviter=user,
         ))
 
@@ -425,7 +426,7 @@ async def user_set_email(
     # 別アドレスの持ち主が連携し直せるよう、既存の Google 連携は解除する
     target.google_sub = None
     db.commit()
-    return _users_page(request, user, db, invite=await issue_invite(target, inviter=user))
+    return _users_page(request, user, db, invite=await issue_invite(target, request=request, inviter=user))
 
 
 @router.post("/admin/users/reinvite/{user_id}", response_class=HTMLResponse)
@@ -450,7 +451,7 @@ async def user_reinvite(
     if not target.is_invite_pending and not settings.google_enabled:
         return _users_page(request, user, db, error="Google ログインが設定されていないため、Google 連携のリンクは発行できません")
 
-    return _users_page(request, user, db, invite=await issue_invite(target, inviter=user))
+    return _users_page(request, user, db, invite=await issue_invite(target, request=request, inviter=user))
 
 
 # --- System Config（全体共通: セッション有効期限） ---

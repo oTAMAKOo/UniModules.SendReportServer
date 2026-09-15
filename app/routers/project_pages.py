@@ -316,7 +316,7 @@ async def member_invite(
 
     db.add(ProjectMember(project_id=ctx.project.id, user_id=new_user.id, role=role))
     db.commit()
-    return _members_page(request, ctx, db, invite=await issue_invite(new_user, inviter=ctx.user, project=ctx.project))
+    return _members_page(request, ctx, db, invite=await issue_invite(new_user, request=request, inviter=ctx.user, project=ctx.project))
 
 
 @router.post("/users/role/{user_id}")
@@ -394,7 +394,7 @@ async def member_reinvite(
     if not target.is_invite_pending and not settings.google_enabled:
         return _members_page(request, ctx, db, error="Google ログインが設定されていないため、Google 連携のリンクは発行できません")
 
-    return _members_page(request, ctx, db, invite=await issue_invite(target, inviter=ctx.user, project=ctx.project))
+    return _members_page(request, ctx, db, invite=await issue_invite(target, request=request, inviter=ctx.user, project=ctx.project))
 
 
 # --- プロジェクト設定（AES Key/IV、プロジェクト管理者） ---

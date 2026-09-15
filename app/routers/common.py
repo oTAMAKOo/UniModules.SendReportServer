@@ -113,18 +113,21 @@ async def issue_invite(
     target: AdminUser,
     note: str | None = None,
     *,
+    request: Request | None = None,
     inviter: AdminUser | None = None,
     project: Project | None = None,
 ) -> dict:
     """招待リンクを発行し、MAIL_MODE に応じてメールを送る。画面表示用の情報を返す。
 
     リンク先は有効化ページ（/invite/{token}）で、本人が Google ログインかパスワード設定を選ぶ。
+    リンクのホストは PUBLIC_BASE_URL。未設定なら request.base_url（nginx 越しでは http になる）で補う。
     inviter / project はメール本文に載せる（誰がどのプロジェクトに招待したか）。
     メール送信（SMTP / SES）は同期 I/O なので、イベントループを塞いでレポート受信まで
     止めないようスレッドプールで実行する。
     """
     token = create_invite_token(target)
-    url = f"{settings.public_base_url}{settings.url_prefix}/invite/{token}"
+    base_url = settings.public_base_url or (str(request.base_url).rstrip("/") if request is not None else "")
+    url = f"{base_url}{settings.url_prefix}/invite/{token}"
     result = {
         "username": target.username,
         "email": target.email,
